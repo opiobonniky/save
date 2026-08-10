@@ -228,46 +228,49 @@ System media tools are left installed because other applications may use them.
 
 ## Usage
 
+Quote URLs in the terminal. This is required for URLs containing characters
+such as `?` or `&`, which shells such as zsh otherwise interpret themselves.
+
 ```bash
 # Zero-decision default: balanced 1080p, one extraction, no menu
-save-video-cli https://youtube.com/watch?v=xyz
+save-video-cli "https://youtube.com/watch?v=xyz"
 
 # Select a quality preset, including unlimited best quality
-save-video-cli https://youtube.com/watch?v=xyz --quality 720p
-save-video-cli https://youtube.com/watch?v=xyz --quality best
+save-video-cli "https://youtube.com/watch?v=xyz" --quality 720p
+save-video-cli "https://youtube.com/watch?v=xyz" --quality best
 
 # Want control over the exact format instead? Opt in explicitly:
-save-video-cli https://youtube.com/watch?v=xyz --choose
+save-video-cli "https://youtube.com/watch?v=xyz" --choose
 
 # Save to a specific directory (trailing argument)
-save-video-cli https://youtube.com/watch?v=xyz ~/Videos
+save-video-cli "https://youtube.com/watch?v=xyz" ~/Videos
 
 # Skip straight to a known format id (no picker)
-save-video-cli https://youtube.com/watch?v=xyz -f 137
+save-video-cli "https://youtube.com/watch?v=xyz" -f 137
 
 # Audio only (best available audio track, converted to mp3)
-save-video-cli https://youtube.com/watch?v=xyz --audio
+save-video-cli "https://youtube.com/watch?v=xyz" --audio
 
 # Subtitles alongside the video
-save-video-cli https://youtube.com/watch?v=xyz --subs en,es
+save-video-cli "https://youtube.com/watch?v=xyz" --subs en,es
 
 # Just list formats without downloading
-save-video-cli https://youtube.com/watch?v=xyz --list-formats
+save-video-cli "https://youtube.com/watch?v=xyz" --list-formats
 
 # Playlist — prompts to download all or pick specific videos
-save-video-cli https://youtube.com/playlist?list=xyz
+save-video-cli "https://youtube.com/playlist?list=xyz"
 
 # Batch mode with two simultaneous downloads
 save-video-cli --batch urls.txt ~/Videos --jobs 2
 
 # Force a fresh download even if the file already exists
-save-video-cli https://youtube.com/watch?v=xyz --overwrite
+save-video-cli "https://youtube.com/watch?v=xyz" --overwrite
 
 # Opt in to aria2c for a large direct file (slower startup)
-save-video-cli https://youtube.com/watch?v=xyz --aria2 --connections 4
+save-video-cli "https://youtube.com/watch?v=xyz" --aria2 --connections 4
 
 # Print startup, transfer, processing, and total timings
-save-video-cli https://youtube.com/watch?v=xyz --timing
+save-video-cli "https://youtube.com/watch?v=xyz" --timing
 
 # Save performance defaults
 save-video-cli config set quality 720p
