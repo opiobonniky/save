@@ -1,13 +1,12 @@
 import AdmZip from 'adm-zip';
 import { createHash } from 'crypto';
-import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
+import { DENO_VERSION, YT_DLP_VERSION } from '../src/toolVersions.js';
 
-const DENO_VERSION = 'v2.9.5';
-const YT_DLP_VERSION = '2026.07.04';
 const root = path.resolve(import.meta.dirname, '..');
 const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const platform = process.platform;
@@ -41,11 +40,11 @@ if (!target) throw new Error(`Unsupported standalone target: ${platform}-${arch}
 
 const platformName = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'macos' : platform;
 const executableSuffix = platform === 'win32' ? '.exe' : '';
-const artifactName = `download-me-${packageJson.version}-${platformName}-${arch}`;
+const artifactName = `save-video-cli-${packageJson.version}-${platformName}-${arch}`;
 const packageDir = path.join(root, 'dist', artifactName);
 const libexecDir = path.join(packageDir, 'libexec');
 const cacheDir = path.join(root, 'dist', '.standalone-cache');
-const appPath = path.join(packageDir, `download-me${executableSuffix}`);
+const appPath = path.join(packageDir, `save-video-cli${executableSuffix}`);
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', ...options });
@@ -87,9 +86,16 @@ mkdirSync(libexecDir, { recursive: true });
 
 run(platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build:bundle']);
 const pkgBin = path.join(root, 'node_modules', '@yao-pkg', 'pkg', 'lib-es5', 'bin.js');
-const builtApp = path.join(root, 'dist', `download-me-${platformName}-${arch}${executableSuffix}`);
-run(process.execPath, [pkgBin, 'dist/download-me.cjs', '--targets', target.pkg, '--output', builtApp]);
+const builtApp = path.join(root, 'dist', `save-video-cli-${platformName}-${arch}${executableSuffix}`);
+run(process.execPath, [pkgBin, 'dist/save-video-cli.cjs', '--targets', target.pkg, '--output', builtApp]);
 copyExecutable(builtApp, appPath);
+if (platform === 'win32') {
+  writeFileSync(path.join(packageDir, 'save-video.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
+  writeFileSync(path.join(packageDir, 'download-me.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
+} else {
+  symlinkSync('save-video-cli', path.join(packageDir, 'save-video'));
+  symlinkSync('save-video-cli', path.join(packageDir, 'download-me'));
+}
 
 const ytDlpDestination = path.join(libexecDir, `yt-dlp${executableSuffix}`);
 await downloadVerified(
@@ -149,9 +155,9 @@ if (platform === 'darwin') {
   for (const binary of binaries) run('codesign', ['--force', '--sign', '-', binary]);
 }
 
-const checksums = ['download-me', 'yt-dlp', 'ffmpeg', 'ffprobe', 'deno']
+const checksums = ['save-video-cli', 'yt-dlp', 'ffmpeg', 'ffprobe', 'deno']
   .map(name => {
-    const relative = `${name === 'download-me' ? '' : 'libexec/'}${name}${executableSuffix}`;
+    const relative = `${name === 'save-video-cli' ? '' : 'libexec/'}${name}${executableSuffix}`;
     return `${sha256(path.join(packageDir, relative))}  ${relative}`;
   })
   .join('\n');

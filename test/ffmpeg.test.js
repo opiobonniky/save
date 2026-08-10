@@ -1,12 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accessSync, constants } from 'fs';
-import { getFfmpegOptions, getManagedFfmpegPath } from '../src/ffmpeg.js';
+import { getFfmpegOptions } from '../src/ffmpeg.js';
 
-test('resolves the executable managed ffmpeg binary for npm installs', () => {
-  const ffmpegPath = getManagedFfmpegPath();
-
-  assert.ok(ffmpegPath);
-  assert.doesNotThrow(() => accessSync(ffmpegPath, constants.X_OK));
-  assert.deepEqual(getFfmpegOptions(), { ffmpegLocation: ffmpegPath });
+test('uses an explicit ffmpeg override without an install script', () => {
+  process.env.DOWNLOAD_ME_FFMPEG = process.execPath;
+  assert.deepEqual(getFfmpegOptions(), { ffmpegLocation: process.execPath });
+  delete process.env.DOWNLOAD_ME_FFMPEG;
 });

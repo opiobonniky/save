@@ -1,6 +1,7 @@
 node_modules/
 dist/
 packaging/**/usr/local/bin/download-me
+packaging/**/usr/local/bin/save-video-cli
 *.log
 .DS_Store
 *.mp4

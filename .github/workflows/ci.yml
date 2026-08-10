@@ -18,13 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - name: Install dependencies (skip youtube-dl-exec's own binary download)
+      - name: Install dependencies
         run: npm ci
-        env:
-          YOUTUBE_DL_SKIP_DOWNLOAD: 'true'
       - name: Syntax check
         run: |
-          for f in bin/download-me.js src/*.js; do node --check "$f"; done
+          for f in bin/save-video-cli.js src/*.js; do node --check "$f"; done
       - name: Run tests
         run: npm test
 
@@ -51,14 +49,12 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm ci
-        env:
-          YOUTUBE_DL_SKIP_DOWNLOAD: 'true'
       - name: Build dependency-free archive
         run: npm run build:standalone
       - name: Upload standalone archive
         uses: actions/upload-artifact@v4
         with:
-          name: download-me-${{ matrix.artifact }}
+          name: save-video-cli-${{ matrix.artifact }}
           path: |
             dist/*.tar.gz
             dist/*.zip

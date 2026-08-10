@@ -1,4 +1,4 @@
-# download-me
+# save-video-cli
 
 A terminal tool for downloading videos from YouTube, TikTok, Facebook, and hundreds of
 other sites, with an interactive format picker.
@@ -10,7 +10,7 @@ which does the actual site-specific extraction work.
 
 - **Playlists.** Paste a playlist URL and choose to download the whole thing
   or pick specific videos from an interactive checklist.
-- **Batch mode.** `download-me --batch urls.txt` downloads every URL in a
+- **Batch mode.** `save-video-cli --batch urls.txt` downloads every URL in a
   text file (one per line, `#` for comments), with bounded `--jobs` concurrency.
 - **Fast direct-video path.** Normal downloads skip the duplicate metadata
   request; full extraction only runs for format picking and playlists.
@@ -18,9 +18,9 @@ which does the actual site-specific extraction work.
   and unlimited `best` available through `--quality`.
 - **Friendly format picker.** Formats are labeled as 360p, 720p, 1080p, etc.;
   YouTube storyboard thumbnails are excluded from downloadable choices.
-- **Saved defaults.** `download-me config set outputDir ~/Videos` remembers
+- **Saved defaults.** `save-video-cli config set outputDir ~/Videos` remembers
   a default output directory (and default subtitle language) across runs.
-  `download-me config get` / `config reset` to inspect or clear.
+  `save-video-cli config get` / `config reset` to inspect or clear.
 - **Automatic retries.** Transient network failures retry automatically
   (10 attempts) instead of failing the whole download on one hiccup.
 - **Resume awareness.** Partial downloads resume automatically (yt-dlp's
@@ -50,14 +50,14 @@ depend on — that layer is verified by actually running the tool against a
 real URL (see Known limitations).
 
 
-`download-me` uses yt-dlp's native concurrent-fragment downloader by default
+`save-video-cli` uses yt-dlp's native concurrent-fragment downloader by default
 (`--concurrent-fragments 4`, configurable with `--connections`). It starts faster, reports progress more often,
 and works particularly well for the DASH/HLS streams used by YouTube.
 
 For a large direct file, opt in to aria2c's multi-connection downloader:
 
 ```bash
-download-me <url> --aria2
+save-video-cli <url> --aria2
 ```
 
 aria2c can improve throughput when connection count is the bottleneck, but it
@@ -73,10 +73,10 @@ Download the archive for your computer from the
 
 | System | Archive |
 | --- | --- |
-| Linux x64 | `download-me-<version>-linux-x64.tar.gz` |
-| Windows x64 | `download-me-<version>-windows-x64.zip` |
-| macOS Intel | `download-me-<version>-macos-x64.tar.gz` |
-| macOS Apple silicon | `download-me-<version>-macos-arm64.tar.gz` |
+| Linux x64 | `save-video-cli-<version>-linux-x64.tar.gz` |
+| Windows x64 | `save-video-cli-<version>-windows-x64.zip` |
+| macOS Intel | `save-video-cli-<version>-macos-x64.tar.gz` |
+| macOS Apple silicon | `save-video-cli-<version>-macos-arm64.tar.gz` |
 
 The archive contains the app runtime, standalone yt-dlp, ffmpeg, ffprobe, and
 Deno. It does not need Node.js, Python, npm, yt-dlp, ffmpeg, Deno, sudo, or a
@@ -86,21 +86,21 @@ executable; the application resolves its private tools from there.
 On Linux or macOS, extract and run it in place:
 
 ```bash
-tar -xzf download-me-<version>-<platform>-<arch>.tar.gz
-cd download-me-<version>-<platform>-<arch>
-./download-me doctor
-./download-me <url>
+tar -xzf save-video-cli-<version>-<platform>-<arch>.tar.gz
+cd save-video-cli-<version>-<platform>-<arch>
+./save-video-cli doctor
+./save-video-cli <url>
 ```
 
 The extracted archive also includes an optional `install.sh`, which copies the
-whole self-contained application under `/usr/local` and adds the `download-me`
+whole self-contained application under `/usr/local` and adds the `save-video-cli`
 command to `PATH`.
 
 On Windows, extract the ZIP and run these commands in PowerShell:
 
 ```powershell
-.\download-me.exe doctor
-.\download-me.exe <url>
+.\save-video-cli.exe doctor
+.\save-video-cli.exe <url>
 ```
 
 Windows SmartScreen and macOS Gatekeeper may warn because release files are not
@@ -112,19 +112,23 @@ its adjacent `.sha256` file before running it.
 
 ```bash
 npm install -g save-video-cli
-download-me --version
+save-video-cli --version
 ```
 
+`save-video-cli` is the primary command. `save-video` is a shorter equivalent,
+and the previous `download-me` command remains available for existing scripts.
+
 The npm installation does not run `sudo` or modify system packages behind the
-scenes. npm installs managed copies of yt-dlp and ffmpeg. Unix npm installs
-also need Python 3 for the upstream yt-dlp executable, and full YouTube support
-needs Deno 2.3+ or Node.js 22+. Use the dependency-free archive if you do not
-want to install those runtimes. `aria2` remains optional acceleration.
+scenes. On first use, the CLI downloads standalone yt-dlp and ffmpeg binaries,
+verifies their pinned SHA-256 checksums, and stores them in the user's cache.
+No dependency install scripts or Python are required. Full YouTube support
+still needs Deno 2.3+ or Node.js 22+; use the dependency-free archive to receive
+Deno too. `aria2` remains optional.
 
 ### From a local checkout
 
 Running `npm install` only installs development dependencies. Use either the
-installer or npm's global install command to register `download-me` on `PATH`:
+installer or npm's global install command to register `save-video-cli` on `PATH`:
 
 ```bash
 git clone https://github.com/opiobonniky/download-me.git
@@ -139,7 +143,7 @@ npm install
 npm install -g .
 ```
 
-If npm reports `EEXIST` for the `download-me` executable, an older global
+If npm reports `EEXIST` for the `save-video-cli` or legacy `download-me` executable, an older global
 package name still owns that command. Remove the legacy package before
 installing the current one:
 
@@ -159,14 +163,14 @@ resolved automatically:
 npm install
 npm run build:binary
 bash scripts/build-deb.sh
-sudo apt install ./dist/download-me_1.0.0-1_amd64.deb
+sudo apt install ./dist/save-video-cli_1.2.1-1_amd64.deb
 ```
 
-Use `apt install ./file.deb`, including the `./`. Plain `install download-me`
+Use `apt install ./file.deb`, including the `./`. Plain `install save-video-cli`
 is a different Linux file-copy command, while `dpkg -i` does not resolve
 missing dependencies automatically.
 
-For users to run `sudo apt install download-me` by package name, the generated
+For users to run `sudo apt install save-video-cli` by package name, the generated
 `.deb` must first be published in a signed apt repository. A GitHub Release can
 host direct `.deb` downloads, but it is not itself an apt repository.
 
@@ -186,7 +190,7 @@ with a restricted `PATH`, and writes the release archive under `dist/`.
 ## Requirements
 
 - Dependency-free archives: no separately installed software
-- npm installations: Node.js 18+, plus Python 3 on Linux/macOS
+- npm installations: Node.js 18+; yt-dlp is prepared automatically on first use
 - Debian package: system `yt-dlp` and ffmpeg packages
 - npm/ Debian: Deno 2.3+ or Node.js 22+ for full YouTube JavaScript challenge support
 - `aria2c` optional for multi-connection acceleration (`aria2` package on apt)
@@ -194,7 +198,7 @@ with a restricted `PATH`, and writes the release archive under `dist/`.
 Check the installed runtime at any time:
 
 ```bash
-download-me doctor
+save-video-cli doctor
 ```
 
 ## Uninstalling
@@ -203,7 +207,7 @@ Use the command matching the installation method:
 
 ```bash
 npm uninstall -g save-video-cli
-sudo apt remove download-me
+sudo apt remove save-video-cli
 bash uninstall.sh  # standalone installer
 ```
 
@@ -227,48 +231,48 @@ System media tools are left installed because other applications may use them.
 
 ```bash
 # Zero-decision default: balanced 1080p, one extraction, no menu
-download-me https://youtube.com/watch?v=xyz
+save-video-cli https://youtube.com/watch?v=xyz
 
 # Select a quality preset, including unlimited best quality
-download-me https://youtube.com/watch?v=xyz --quality 720p
-download-me https://youtube.com/watch?v=xyz --quality best
+save-video-cli https://youtube.com/watch?v=xyz --quality 720p
+save-video-cli https://youtube.com/watch?v=xyz --quality best
 
 # Want control over the exact format instead? Opt in explicitly:
-download-me https://youtube.com/watch?v=xyz --choose
+save-video-cli https://youtube.com/watch?v=xyz --choose
 
 # Save to a specific directory (trailing argument)
-download-me https://youtube.com/watch?v=xyz ~/Videos
+save-video-cli https://youtube.com/watch?v=xyz ~/Videos
 
 # Skip straight to a known format id (no picker)
-download-me https://youtube.com/watch?v=xyz -f 137
+save-video-cli https://youtube.com/watch?v=xyz -f 137
 
 # Audio only (best available audio track, converted to mp3)
-download-me https://youtube.com/watch?v=xyz --audio
+save-video-cli https://youtube.com/watch?v=xyz --audio
 
 # Subtitles alongside the video
-download-me https://youtube.com/watch?v=xyz --subs en,es
+save-video-cli https://youtube.com/watch?v=xyz --subs en,es
 
 # Just list formats without downloading
-download-me https://youtube.com/watch?v=xyz --list-formats
+save-video-cli https://youtube.com/watch?v=xyz --list-formats
 
 # Playlist — prompts to download all or pick specific videos
-download-me https://youtube.com/playlist?list=xyz
+save-video-cli https://youtube.com/playlist?list=xyz
 
 # Batch mode with two simultaneous downloads
-download-me --batch urls.txt ~/Videos --jobs 2
+save-video-cli --batch urls.txt ~/Videos --jobs 2
 
 # Force a fresh download even if the file already exists
-download-me https://youtube.com/watch?v=xyz --overwrite
+save-video-cli https://youtube.com/watch?v=xyz --overwrite
 
 # Opt in to aria2c for a large direct file (slower startup)
-download-me https://youtube.com/watch?v=xyz --aria2 --connections 4
+save-video-cli https://youtube.com/watch?v=xyz --aria2 --connections 4
 
 # Print startup, transfer, processing, and total timings
-download-me https://youtube.com/watch?v=xyz --timing
+save-video-cli https://youtube.com/watch?v=xyz --timing
 
 # Save performance defaults
-download-me config set quality 720p
-download-me config set connections 4
+save-video-cli config set quality 720p
+save-video-cli config set connections 4
 ```
 
 A desktop notification fires automatically when a download finishes. Click it
@@ -280,9 +284,9 @@ the notification listener never blocks the CLI.
 ## Project structure
 
 ```
-download-me/
+save-video-cli/
 ├── bin/
-│   └── download-me.js      # CLI entry point (argument parsing, orchestration)
+│   └── save-video-cli.js   # CLI entry point (argument parsing, orchestration)
 ├── src/
 │   ├── extract.js           # fetches available formats for a URL via yt-dlp
 │   ├── prompt.js              # interactive format picker (inquirer)
@@ -292,7 +296,7 @@ download-me/
 ├── scripts/
 │   └── install-deps.sh       # auto-installs yt-dlp/ffmpeg (used by both install paths)
 ├── dist/
-│   └── download-me-linux      # prebuilt standalone binary (after npm run build:binary)
+│   └── save-video-cli-linux   # prebuilt standalone binary (after npm run build:binary)
 ├── install.sh                  # installs via npm (machine already has Node.js)
 ├── install-standalone.sh         # installs the bundled binary (no Node.js needed)
 ├── package.json

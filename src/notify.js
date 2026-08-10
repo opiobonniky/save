@@ -38,14 +38,14 @@ export function notifyDone(title, body, openPath) {
       if (openPath && commandExists('xdg-open') && notifySendSupportsActions()) {
         // Wait for the click in a detached shell so the CLI can exit immediately.
         const actionScript =
-          'action=$(notify-send --app-name=download-me --action="default=Open folder" "$1" "$2"); ' +
+          'action=$(notify-send --app-name=save-video-cli --action="default=Open folder" "$1" "$2"); ' +
           '[ "$action" = default ] && xdg-open "$3" >/dev/null 2>&1';
-        runDetached('sh', ['-c', actionScript, 'download-me-notify', title, body, openPath]);
+        runDetached('sh', ['-c', actionScript, 'save-video-cli-notify', title, body, openPath]);
       } else {
-        runDetached('notify-send', ['--app-name=download-me', title, body]);
+        runDetached('notify-send', ['--app-name=save-video-cli', title, body]);
       }
     } else if (commandExists('terminal-notifier')) {
-      const args = ['-title', title, '-message', body, '-group', 'download-me'];
+      const args = ['-title', title, '-message', body, '-group', 'save-video-cli'];
       if (openPath) args.push('-open', pathToFileURL(openPath).href);
       runDetached('terminal-notifier', args);
     } else if (commandExists('osascript')) {

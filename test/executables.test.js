@@ -24,7 +24,7 @@ function createExecutable(filePath) {
 test('resolves a bundled executable beside a packaged app with spaces in its path', () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'download me-'));
   temporaryDirectories.push(directory);
-  const execPath = path.join(directory, 'download-me');
+  const execPath = path.join(directory, 'save-video-cli');
   const ytDlpPath = path.join(directory, 'libexec', 'yt-dlp');
   createExecutable(ytDlpPath);
 
@@ -35,9 +35,9 @@ test('resolves a bundled executable beside a packaged app with spaces in its pat
 });
 
 test('uses Windows executable names', () => {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'download-me-win-'));
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'save-video-cli-win-'));
   temporaryDirectories.push(directory);
-  const execPath = path.join(directory, 'download-me.exe');
+  const execPath = path.join(directory, 'save-video-cli.exe');
   const ffmpegPath = path.join(directory, 'libexec', 'ffmpeg.exe');
   createExecutable(ffmpegPath);
 

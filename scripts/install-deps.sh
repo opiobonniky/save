@@ -57,7 +57,7 @@ ensure_dep() {
 }
 
 echo ""
-echo "Setting up download-me dependencies..."
+echo "Setting up save-video-cli dependencies..."
 echo ""
 
 ensure_dep yt-dlp
@@ -78,5 +78,5 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}Setup complete.${RESET} You can now run: download-me <url>"
+echo -e "${GREEN}Setup complete.${RESET} You can now run: save-video-cli <url>"
 echo ""

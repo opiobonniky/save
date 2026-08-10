@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveQualitySelector } from '../src/options.js';
 
-// Mirrors the exact format-selection decision logic in bin/download-me.js's
+// Mirrors the exact format-selection decision logic in bin/save-video-cli.js's
 // run(). Kept as a standalone pure function so the "zero-decision by default"
 // behavior is locked in by a test, not just manual verification — this is
 // the core promise of the --choose feature: pickFormat must NEVER be invoked

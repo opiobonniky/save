@@ -18,13 +18,17 @@ import {
 import { getRuntimeDiagnostics } from '../src/runtime.js';
 import { parseBatchLines, runWorkerPool } from '../src/batch.js';
 import { VERSION } from '../src/version.js';
+import { ensureManagedYtDlp } from '../src/managedYtDlp.js';
+import { getYtDlpExecutablePath } from '../src/ytdlp.js';
+import { ensureManagedFfmpeg } from '../src/managedFfmpeg.js';
+import { getFfmpegExecutablePath } from '../src/ffmpeg.js';
 
 const program = new Command();
 
 program
-  .name('download-me')
+  .name('save-video-cli')
   .description('Fast, friendly video and audio downloads powered by yt-dlp')
-  .usage('[options] <url> [outputDir]\n       download-me --batch <file> [outputDir]\n       download-me <command>')
+  .usage('[options] <url> [outputDir]\n       save-video-cli --batch <file> [outputDir]\n       save-video-cli <command>')
   .version(VERSION)
   .showSuggestionAfterError()
   .showHelpAfterError()
@@ -63,43 +67,43 @@ program
   .addHelpText('after', `
 Defaults:
   Quality is 1080p and connections is 4. Change saved defaults with:
-    download-me config set quality 720p
-    download-me config set connections 4
-    download-me config set outputDir ~/Videos
+    save-video-cli config set quality 720p
+    save-video-cli config set connections 4
+    save-video-cli config set outputDir ~/Videos
 
 Examples:
-  download-me "https://youtu.be/VIDEO_ID"
-  download-me "https://youtu.be/VIDEO_ID" ~/Videos --quality 720p
-  download-me "https://youtu.be/VIDEO_ID" --choose
-  download-me "https://youtu.be/VIDEO_ID" --audio
-  download-me "https://youtu.be/VIDEO_ID" --subs en,fr
-  download-me "https://youtube.com/playlist?list=LIST_ID"
-  download-me --batch urls.txt ~/Videos --jobs 2
-  download-me "https://example.com/large-video" --aria2 --connections 4
-  download-me "https://youtu.be/VIDEO_ID" --timing
+  save-video-cli "https://youtu.be/VIDEO_ID"
+  save-video-cli "https://youtu.be/VIDEO_ID" ~/Videos --quality 720p
+  save-video-cli "https://youtu.be/VIDEO_ID" --choose
+  save-video-cli "https://youtu.be/VIDEO_ID" --audio
+  save-video-cli "https://youtu.be/VIDEO_ID" --subs en,fr
+  save-video-cli "https://youtube.com/playlist?list=LIST_ID"
+  save-video-cli --batch urls.txt ~/Videos --jobs 2
+  save-video-cli "https://example.com/large-video" --aria2 --connections 4
+  save-video-cli "https://youtu.be/VIDEO_ID" --timing
 
 Useful commands:
-  download-me doctor          Check yt-dlp, ffmpeg, aria2c, and JS runtime support
-  download-me config get      Show saved defaults
-  download-me config reset    Restore all defaults
+  save-video-cli doctor          Check yt-dlp, ffmpeg, aria2c, and JS runtime support
+  save-video-cli config get      Show saved defaults
+  save-video-cli config reset    Restore all defaults
 
 Notes:
   --quality best may download very large 1440p or 4K files.
   Use --aria2 only when native downloading does not fill your connection.
   Respect site terms and content rights.`);
 
-// --- config subcommand: download-me config <get|set|reset> ---
+// --- config subcommand: save-video-cli config <get|set|reset> ---
 const configCmd = program
   .command('config')
   .description('view or change saved defaults')
   .addHelpText('after', `
 Examples:
-  download-me config get
-  download-me config set outputDir ~/Videos
-  download-me config set quality 720p
-  download-me config set connections 4
-  download-me config set subLangs en,fr
-  download-me config reset
+  save-video-cli config get
+  save-video-cli config set outputDir ~/Videos
+  save-video-cli config set quality 720p
+  save-video-cli config set connections 4
+  save-video-cli config set subLangs en,fr
+  save-video-cli config reset
 
 Known keys: outputDir, quality, connections, subLangs`);
 
@@ -141,7 +145,21 @@ configCmd
 program
   .command('doctor')
   .description('check downloader dependencies and YouTube runtime support')
-  .action(() => {
+  .action(async () => {
+    if (!getYtDlpExecutablePath()) {
+      try {
+        await ensureManagedYtDlp();
+      } catch (error) {
+        console.error(chalk.red(`yt-dlp setup failed: ${error.message}`));
+      }
+    }
+    if (!getFfmpegExecutablePath()) {
+      try {
+        await ensureManagedFfmpeg();
+      } catch (error) {
+        console.error(chalk.red(`ffmpeg setup failed: ${error.message}`));
+      }
+    }
     const diagnostics = getRuntimeDiagnostics();
     console.log(
       `yt-dlp: ${diagnostics.ytDlp || 'missing'}${diagnostics.ytDlpSource ? ` (${diagnostics.ytDlpSource})` : ''}`
@@ -197,6 +215,8 @@ function ensureOutputDir(outputDir) {
 
 async function run(url, outputDirArg, options) {
   const operationStartedAt = Date.now();
+  if (!getYtDlpExecutablePath()) await ensureManagedYtDlp();
+  if (!getFfmpegExecutablePath()) await ensureManagedFfmpeg();
   checkDependencies({ requireFfmpeg: false });
 
   const outputDir = await resolveOutputDir(outputDirArg);
@@ -390,4 +410,4 @@ async function runBatch(batchFile, outputDirArg, options) {
   console.log(chalk.bold(`\nBatch complete: ${succeeded} succeeded, ${failed} failed.`));
 }
 
-program.parse();
+program.parseAsync();

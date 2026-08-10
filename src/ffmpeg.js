@@ -1,16 +1,9 @@
-import { accessSync, constants } from 'fs';
-import ffmpegStatic from 'ffmpeg-static';
-import { canRun, getBundledExecutable } from './executables.js';
+import { canRun, getBundledExecutable, isExecutable } from './executables.js';
+import { getManagedFfmpegPath as getManagedPath } from './managedFfmpeg.js';
 
 export function getManagedFfmpegPath() {
-  if (process.pkg || !ffmpegStatic) return null;
-
-  try {
-    accessSync(ffmpegStatic, constants.X_OK);
-    return ffmpegStatic;
-  } catch {
-    return null;
-  }
+  const managed = getManagedPath();
+  return isExecutable(managed) ? managed : null;
 }
 
 export function getFfmpegOptions() {

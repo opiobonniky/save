@@ -1,10 +1,12 @@
 {
   "name": "save-video-cli",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "CLI tool to download videos from YouTube, TikTok, Facebook, and other platforms via yt-dlp",
   "type": "module",
   "bin": {
-    "download-me": "bin/download-me.js"
+    "save-video-cli": "bin/save-video-cli.js",
+    "save-video": "bin/save-video-cli.js",
+    "download-me": "bin/save-video-cli.js"
   },
   "files": [
     "bin",
@@ -18,11 +20,11 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node bin/download-me.js",
+    "start": "node bin/save-video-cli.js",
     "test": "node --test",
     "setup:linux": "bash scripts/install-deps.sh",
-    "build:bundle": "esbuild bin/download-me.js --bundle --platform=node --format=cjs --outfile=dist/download-me.cjs",
-    "build:binary": "npm run build:bundle && pkg dist/download-me.cjs --targets node18-linux-x64 --output dist/download-me-linux",
+    "build:bundle": "esbuild bin/save-video-cli.js --bundle --platform=node --format=cjs --outfile=dist/save-video-cli.cjs",
+    "build:binary": "npm run build:bundle && pkg dist/save-video-cli.cjs --targets node18-linux-x64 --output dist/save-video-cli-linux",
     "build:standalone": "node scripts/build-standalone.mjs"
   },
   "pkg": {
@@ -53,14 +55,16 @@
     "cli-progress": "^3.12.0",
     "commander": "^12.0.0",
     "conf": "^13.1.0",
-    "ffmpeg-static": "^5.3.0",
-    "inquirer": "^9.2.0",
-    "youtube-dl-exec": "^3.0.0"
+    "inquirer": "^9.2.0"
   },
   "devDependencies": {
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "@yao-pkg/pkg": "6.12.0",
     "adm-zip": "^0.6.0",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "ffmpeg-static": "^5.3.0"
+  },
+  "allowScripts": {
+    "ffmpeg-static@5.3.0": true
   }
 }

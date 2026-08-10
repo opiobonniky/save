@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot installer for download-me.
+# One-shot installer for save-video-cli.
 # Run this once: bash install.sh
 # It handles the global install and PATH setup via npm. The package includes
 # managed yt-dlp and ffmpeg binaries, so no system packages are required.
@@ -7,7 +7,7 @@
 
 set -e
 
-echo "Installing download-me..."
+echo "Installing save-video-cli..."
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is required but wasn't found."
@@ -16,37 +16,45 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 # npm refuses to replace a bin owned by an older package name. Remove only
-# known download-me installations; never force-overwrite an unrelated command.
-if command -v download-me >/dev/null 2>&1; then
-  EXISTING_BIN="$(readlink -f "$(command -v download-me)")"
-  PROJECT_BIN="$(readlink -f "$(dirname "$0")/bin/download-me.js")"
-  GLOBAL_ROOT="$(npm root -g)"
-
+# known save-video-cli aliases; never overwrite an unrelated command.
+PROJECT_BIN="$(readlink -f "$(dirname "$0")/bin/save-video-cli.js")"
+GLOBAL_ROOT="$(npm root -g)"
+REMOVE_OLD=false
+for COMMAND_NAME in save-video-cli save-video download-me; do
+  if ! command -v "$COMMAND_NAME" >/dev/null 2>&1; then
+    continue
+  fi
+  EXISTING_BIN="$(readlink -f "$(command -v "$COMMAND_NAME")")"
   case "$EXISTING_BIN" in
     "$PROJECT_BIN"|\
     "$GLOBAL_ROOT/download-me/bin/download-me.js"|\
     "$GLOBAL_ROOT/video-download-cli/bin/download-me.js"|\
     "$GLOBAL_ROOT/save-video-cli/bin/download-me.js"|\
+    "$GLOBAL_ROOT/save-video-cli/bin/save-video-cli.js"|\
     "$GLOBAL_ROOT/@opiobonniky/download-me/bin/download-me.js"|\
     "$GLOBAL_ROOT/@opiobonniky/vidfetch/bin/download-me.js")
-      echo "Removing an older download-me package link..."
-      npm uninstall -g download-me video-download-cli save-video-cli \
-        @opiobonniky/download-me @opiobonniky/vidfetch >/dev/null 2>&1 || true
+      REMOVE_OLD=true
       ;;
     *)
-      echo "Cannot install: 'download-me' already belongs to another program:"
+      echo "Cannot install: '$COMMAND_NAME' already belongs to another program:"
       echo "  $EXISTING_BIN"
       echo "Remove that program explicitly, then run this installer again."
       echo "Refusing to use npm --force because it could overwrite unrelated software."
       exit 1
       ;;
   esac
+done
+
+if [ "$REMOVE_OLD" = true ]; then
+  echo "Removing an older save-video-cli package link..."
+  npm uninstall -g download-me video-download-cli save-video-cli \
+    @opiobonniky/download-me @opiobonniky/vidfetch >/dev/null 2>&1 || true
 fi
 
 # Installing globally from the local folder:
-# - registers the 'download-me' command on PATH automatically (npm's "bin" field)
+# - registers save-video-cli, save-video, and the legacy download-me alias on PATH
 npm install -g .
 
 echo ""
 echo "Installed. Try it from anywhere:"
-echo "  download-me <url>"
+echo "  save-video-cli <url>"

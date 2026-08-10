@@ -187,7 +187,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     clearInterval(preparationTimer);
     bar.stop();
     const hint = /ffmpeg/i.test(stderrBuffer)
-      ? '\n(ffmpeg processing failed. Run download-me doctor and reinstall the package if ffmpeg is missing.)'
+      ? '\n(ffmpeg processing failed. Run save-video-cli doctor and reinstall the package if ffmpeg is missing.)'
       : usingAria2c
         ? '\n(aria2c was used for this download — try again without it if this persists.)'
         : '';
