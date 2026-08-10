@@ -91,6 +91,7 @@ Useful commands:
   save-video-cli config reset    Restore all defaults
 
 Notes:
+  Always quote URLs containing ? or &; otherwise the shell may split or background the command.
   --quality best may download very large 1440p or 4K files.
   Use --aria2 only when native downloading does not fill your connection.
   Respect site terms and content rights.`);

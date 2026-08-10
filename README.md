@@ -230,6 +230,8 @@ System media tools are left installed because other applications may use them.
 
 Quote URLs in the terminal. This is required for URLs containing characters
 such as `?` or `&`, which shells such as zsh otherwise interpret themselves.
+An unquoted `&` makes Bash run the downloader in the background, producing a
+`[1] <pid>` message and treating anything after it as a separate command.
 
 ```bash
 # Zero-decision default: balanced 1080p, one extraction, no menu
