@@ -137,11 +137,11 @@ if (platform !== 'win32') {
 }
 mkdirSync(path.join(packageDir, 'licenses'), { recursive: true });
 cpSync(
-  path.join(root, 'node_modules', 'ffmpeg-static', 'ffmpeg.LICENSE'),
+  `${ffmpegPath}.LICENSE`,
   path.join(packageDir, 'licenses', 'FFMPEG-GPL-3.0.txt')
 );
 cpSync(
-  path.join(root, 'node_modules', 'ffmpeg-static', 'ffmpeg.README'),
+  `${ffmpegPath}.README`,
   path.join(packageDir, 'licenses', 'FFMPEG-BUILD-README.txt')
 );
 await Promise.all([
