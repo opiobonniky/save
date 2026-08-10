@@ -188,7 +188,7 @@ async function run(url, outputDirArg, options) {
   if (options.listFormats) {
     console.log(
       chalk.bold(
-        `\n${'ID'.padEnd(10)}${'Ext'.padEnd(8)}${'Res'.padEnd(12)}${'Size'.padEnd(10)}${'Type'.padEnd(14)}Note`
+        `\n${'ID'.padEnd(10)}${'Ext'.padEnd(8)}${'Quality'.padEnd(12)}${'Size'.padEnd(10)}${'Type'.padEnd(14)}Note`
       )
     );
     formats.forEach(f => console.log(formatRow(f)));

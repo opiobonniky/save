@@ -5,6 +5,7 @@ import {
   isAudioOnly,
   formatSize,
   formatKind,
+  formatQuality,
   formatRow,
   formatChoiceLabel,
 } from '../src/formatUtils.js';
@@ -56,6 +57,23 @@ describe('formatKind', () => {
   });
 });
 
+describe('formatQuality', () => {
+  test('uses familiar vertical quality labels', () => {
+    assert.equal(formatQuality({ height: 1080, vcodec: 'avc1', acodec: 'none' }), '1080p');
+  });
+
+  test('derives quality from raw dimensions when height is unavailable', () => {
+    assert.equal(
+      formatQuality({ resolution: '640x360', vcodec: 'avc1', acodec: 'none' }),
+      '360p'
+    );
+  });
+
+  test('labels audio formats clearly', () => {
+    assert.equal(formatQuality({ vcodec: 'none', acodec: 'opus' }), 'audio only');
+  });
+});
+
 describe('formatRow', () => {
   test('produces a row without throwing on missing optional fields', () => {
     const row = formatRow({
@@ -75,7 +93,9 @@ describe('formatRow', () => {
 
 describe('formatChoiceLabel', () => {
   test('tags video-only formats with a merge hint', () => {
-    const label = formatChoiceLabel({ format_id: '137', ext: 'mp4', resolution: '1080p', filesize: 1000000, vcodec: 'avc1', acodec: 'none' });
+    const label = formatChoiceLabel({ format_id: '137', ext: 'mp4', resolution: '1920x1080', height: 1080, filesize: 1000000, vcodec: 'avc1', acodec: 'none' });
+    assert.match(label, /^1080p/);
+    assert.match(label, /ID 137/);
     assert.match(label, /video only — audio merged automatically/);
   });
   test('does not tag combined formats', () => {

@@ -1,10 +1,10 @@
 {
-  "name": "download-me",
-  "version": "1.0.0",
+  "name": "save-video-cli",
+  "version": "1.0.1",
   "description": "CLI tool to download videos from YouTube, TikTok, Facebook, and other platforms via yt-dlp",
   "type": "module",
   "bin": {
-    "download-me": "./bin/download-me.js"
+    "download-me": "bin/download-me.js"
   },
   "files": [
     "bin",

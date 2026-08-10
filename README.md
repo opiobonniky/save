@@ -16,6 +16,8 @@ which does the actual site-specific extraction work.
   request; full extraction only runs for format picking and playlists.
 - **Quality presets.** Balanced 1080p is the default, with 360p through 2160p
   and unlimited `best` available through `--quality`.
+- **Friendly format picker.** Formats are labeled as 360p, 720p, 1080p, etc.;
+  YouTube storyboard thumbnails are excluded from downloadable choices.
 - **Saved defaults.** `download-me config set outputDir ~/Videos` remembers
   a default output directory (and default subtitle language) across runs.
   `download-me config get` / `config reset` to inspect or clear.
@@ -92,7 +94,7 @@ After publishing the package with `npm publish`, the shorter registry command
 will work:
 
 ```bash
-npm install -g download-me
+npm install -g save-video-cli
 ```
 
 ### From a local checkout
@@ -113,6 +115,17 @@ npm install
 npm install -g .
 npm run setup:linux
 ```
+
+If npm reports `EEXIST` for the `download-me` executable, an older global
+package name still owns that command. Remove the legacy package before
+installing the current one:
+
+```bash
+npm uninstall -g download-me video-download-cli @opiobonniky/vidfetch
+npm install -g save-video-cli
+```
+
+Do not use `npm install --force`; it can overwrite an unrelated executable.
 
 ### Debian and Ubuntu
 
@@ -164,7 +177,7 @@ download-me doctor
 Use the command matching the installation method:
 
 ```bash
-npm uninstall -g download-me
+npm uninstall -g save-video-cli
 sudo apt remove download-me
 bash uninstall.sh  # standalone installer
 ```

@@ -12,6 +12,25 @@ export function resolvePlaylistEntries(rawEntries) {
   return { entries, skipped: rawEntries.length - entries.length };
 }
 
+export function normalizeFormats(formats) {
+  return formats
+    .filter(format =>
+      (format.vcodec && format.vcodec !== 'none') ||
+      (format.acodec && format.acodec !== 'none'))
+    .map(format => ({
+      format_id: format.format_id,
+      ext: format.ext,
+      resolution: format.resolution,
+      width: format.width,
+      height: format.height,
+      filesize: format.filesize || format.filesize_approx || null,
+      note: format.format_note || '',
+      vcodec: format.vcodec,
+      acodec: format.acodec,
+      protocol: format.protocol,
+    }));
+}
+
 /**
  * Fetches video metadata and available formats for a given URL
  * without downloading anything. Works for any site yt-dlp supports
@@ -68,15 +87,6 @@ export async function extractFormats(url) {
   return {
     isPlaylist: false,
     title: info.title || 'Untitled',
-    formats: info.formats.map(f => ({
-      format_id: f.format_id,
-      ext: f.ext,
-      resolution: f.resolution,
-      filesize: f.filesize || f.filesize_approx || null,
-      note: f.format_note || '',
-      vcodec: f.vcodec,
-      acodec: f.acodec,
-      protocol: f.protocol,
-    })),
+    formats: normalizeFormats(info.formats),
   };
 }
