@@ -163,7 +163,7 @@ resolved automatically:
 npm install
 npm run build:binary
 bash scripts/build-deb.sh
-sudo apt install ./dist/save-video-cli_1.2.1-1_amd64.deb
+sudo apt install ./dist/save-video-cli_1.1.2-1_amd64.deb
 ```
 
 Use `apt install ./file.deb`, including the `./`. Plain `install save-video-cli`

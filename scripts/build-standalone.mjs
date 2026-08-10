@@ -7,6 +7,7 @@ import { build as buildWithEsbuild } from 'esbuild';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import { DENO_VERSION, YT_DLP_VERSION } from '../src/toolVersions.js';
+import { parseExpectedChecksum } from '../src/standaloneChecksum.js';
 
 const root = path.resolve(import.meta.dirname, '..');
 const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -67,10 +68,11 @@ async function downloadVerified(url, checksumUrl, destination, assetName) {
   const checksumPath = `${destination}.sha256`;
   await Promise.all([download(url, destination), download(checksumUrl, checksumPath)]);
   const checksumText = readFileSync(checksumPath, 'utf8');
-  const line = checksumText
-    .split(/\r?\n/)
-    .find(entry => entry.trim().split(/\s+/).at(-1)?.replace(/^\*/, '') === assetName);
-  const expected = line?.match(/[a-fA-F0-9]{64}/)?.[0]?.toLowerCase();
+  const expected = parseExpectedChecksum(
+    checksumText,
+    assetName,
+    checksumUrl.endsWith(`${assetName}.sha256sum`)
+  );
   const actual = sha256(destination);
   if (!expected || expected !== actual) throw new Error(`Checksum verification failed for ${assetName}`);
 }
