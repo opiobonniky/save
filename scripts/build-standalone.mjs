@@ -75,6 +75,7 @@ async function downloadVerified(url, checksumUrl, destination, assetName) {
   );
   const actual = sha256(destination);
   if (!expected || expected !== actual) throw new Error(`Checksum verification failed for ${assetName}`);
+  rmSync(checksumPath, { force: true });
 }
 
 function copyExecutable(source, destination) {
@@ -164,27 +165,17 @@ if (platform === 'darwin') {
   for (const binary of binaries) run('codesign', ['--force', '--sign', '-', binary]);
 }
 
-const checksums = ['save-video-cli', 'yt-dlp', 'ffmpeg', 'ffprobe', 'deno']
-  .map(name => {
-    const relative = `${name === 'save-video-cli' ? '' : 'libexec/'}${name}${executableSuffix}`;
-    return `${sha256(path.join(packageDir, relative))}  ${relative}`;
-  })
-  .join('\n');
-writeFileSync(path.join(packageDir, 'SHA256SUMS'), `${checksums}\n`);
-
 const cleanEnv = { ...process.env, PATH: libexecDir };
 run(appPath, ['--version'], { env: cleanEnv });
 run(appPath, ['doctor'], { env: cleanEnv });
 
-let archivePath;
+const archivePath = path.join(root, 'dist', `${artifactName}.zip`);
+rmSync(archivePath, { force: true });
 if (platform === 'win32') {
-  archivePath = path.join(root, 'dist', `${artifactName}.zip`);
   const archive = new AdmZip();
   archive.addLocalFolder(packageDir, artifactName);
   archive.writeZip(archivePath);
 } else {
-  archivePath = path.join(root, 'dist', `${artifactName}.tar.gz`);
-  run('tar', ['-czf', archivePath, '-C', path.join(root, 'dist'), artifactName]);
+  run('zip', ['-qry', archivePath, artifactName], { cwd: path.join(root, 'dist') });
 }
-writeFileSync(`${archivePath}.sha256`, `${sha256(archivePath)}  ${path.basename(archivePath)}\n`);
 console.log(`Built ${path.relative(root, archivePath)}`);

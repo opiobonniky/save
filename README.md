@@ -73,10 +73,10 @@ Download the archive for your computer from the
 
 | System | Archive |
 | --- | --- |
-| Linux x64 | `save-video-cli-<version>-linux-x64.tar.gz` |
+| Linux x64 | `save-video-cli-<version>-linux-x64.zip` |
 | Windows x64 | `save-video-cli-<version>-windows-x64.zip` |
-| macOS Intel | `save-video-cli-<version>-macos-x64.tar.gz` |
-| macOS Apple silicon | `save-video-cli-<version>-macos-arm64.tar.gz` |
+| macOS Intel | `save-video-cli-<version>-macos-x64.zip` |
+| macOS Apple silicon | `save-video-cli-<version>-macos-arm64.zip` |
 
 The archive contains the app runtime, standalone yt-dlp, ffmpeg, ffprobe, and
 Deno. It does not need Node.js, Python, npm, yt-dlp, ffmpeg, Deno, sudo, or a
@@ -86,7 +86,7 @@ executable; the application resolves its private tools from there.
 On Linux or macOS, extract and run it in place:
 
 ```bash
-tar -xzf save-video-cli-<version>-<platform>-<arch>.tar.gz
+unzip save-video-cli-<version>-<platform>-<arch>.zip
 cd save-video-cli-<version>-<platform>-<arch>
 ./save-video-cli doctor
 ./save-video-cli <url>
@@ -104,9 +104,8 @@ On Windows, extract the ZIP and run these commands in PowerShell:
 ```
 
 Windows SmartScreen and macOS Gatekeeper may warn because release files are not
-yet signed with paid platform certificates. Release builds are checksummed,
-and macOS executables receive an ad-hoc signature. Compare the archive against
-its adjacent `.sha256` file before running it.
+yet signed with paid platform certificates. Release dependencies are verified
+during the build, and macOS executables receive an ad-hoc signature.
 
 ### npm alternative
 
@@ -163,7 +162,7 @@ resolved automatically:
 npm install
 npm run build:binary
 bash scripts/build-deb.sh
-sudo apt install ./dist/save-video-cli_1.1.2-1_amd64.deb
+sudo apt install ./dist/save-video-cli_1.1.3-1_amd64.deb
 ```
 
 Use `apt install ./file.deb`, including the `./`. Plain `install save-video-cli`

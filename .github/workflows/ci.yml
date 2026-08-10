@@ -55,10 +55,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: save-video-cli-${{ matrix.artifact }}
-          path: |
-            dist/*.tar.gz
-            dist/*.zip
-            dist/*.sha256
+          path: dist/*.zip
           if-no-files-found: error
 
   release:
@@ -81,7 +78,4 @@ jobs:
       - name: Upload artifacts to the release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release-assets/*.tar.gz
-            release-assets/*.zip
-            release-assets/*.sha256
+          files: release-assets/*.zip
