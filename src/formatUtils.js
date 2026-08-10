@@ -42,7 +42,7 @@ export function formatQuality(f) {
 /** A single aligned text row, used for --list-formats. */
 export function formatRow(f) {
   return (
-    f.format_id.padEnd(10) +
+    f.format_id.padEnd(24) +
     f.ext.padEnd(8) +
     formatQuality(f).padEnd(12) +
     formatSize(f.filesize).padEnd(10) +

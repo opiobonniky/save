@@ -2,6 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isLikelyPlaylistUrl,
+  normalizeMediaUrl,
   parseCount,
   parseProxy,
   resolveQualitySelector,
@@ -55,5 +56,19 @@ describe('playlist URL detection', () => {
 
   test('does not classify a direct video as a playlist', () => {
     assert.equal(isLikelyPlaylistUrl('https://youtu.be/abc?t=2'), false);
+  });
+});
+
+describe('media URL normalization', () => {
+  test('removes unstable tracking parameters from TikTok video URLs', () => {
+    assert.equal(
+      normalizeMediaUrl('https://www.tiktok.com/@user/video/123?is_from_webapp=1&sender_device=pc'),
+      'https://www.tiktok.com/@user/video/123'
+    );
+  });
+
+  test('does not modify unrelated URLs', () => {
+    const url = 'https://youtu.be/abc?si=tracking';
+    assert.equal(normalizeMediaUrl(url), url);
   });
 });

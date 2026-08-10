@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeFormats } from '../src/extract.js';
+import { getExtractOptions, isRetryableExtractionError, normalizeFormats } from '../src/extract.js';
 
 describe('format normalization', () => {
   test('removes YouTube storyboard formats', () => {
@@ -20,4 +20,21 @@ describe('format normalization', () => {
 
     assert.deepEqual(formats.map(format => format.format_id), ['251', '137']);
   });
+});
+
+test('uses flat extraction only when the caller identifies a playlist', () => {
+  const video = getExtractOptions();
+  const playlist = getExtractOptions({ flatPlaylist: true });
+  assert.equal(video.dumpJson, true);
+  assert.equal(video.dumpSingleJson, undefined);
+  assert.equal(video.flatPlaylist, undefined);
+  assert.equal(playlist.dumpJson, false);
+  assert.equal(playlist.dumpSingleJson, true);
+  assert.equal(playlist.flatPlaylist, true);
+});
+
+test('retries transient extraction failures but not permanent errors', () => {
+  assert.equal(isRetryableExtractionError({ stderr: 'Unable to extract universal data for rehydration' }), true);
+  assert.equal(isRetryableExtractionError({ stderr: 'HTTP Error 429: Too Many Requests' }), true);
+  assert.equal(isRetryableExtractionError({ stderr: 'This video is private' }), false);
 });

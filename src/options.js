@@ -50,3 +50,17 @@ export function isLikelyPlaylistUrl(value) {
     return false;
   }
 }
+
+export function normalizeMediaUrl(value) {
+  try {
+    const url = new URL(value);
+    if (/(^|\.)tiktok\.com$/i.test(url.hostname) && /\/@[^/]+\/video\/\d+\/?$/i.test(url.pathname)) {
+      url.search = '';
+      url.hash = '';
+      return url.toString();
+    }
+  } catch {
+    // Leave invalid input untouched so yt-dlp can report the original error.
+  }
+  return value;
+}

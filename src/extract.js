@@ -31,6 +31,23 @@ export function normalizeFormats(formats) {
     }));
 }
 
+export function getExtractOptions(options = {}) {
+  return {
+    dumpJson: !options.flatPlaylist,
+    dumpSingleJson: options.flatPlaylist,
+    noWarnings: true,
+    noCheckCertificates: true,
+    flatPlaylist: options.flatPlaylist,
+    proxy: options.proxy,
+    ...getYtDlpRuntimeOptions(),
+  };
+}
+
+export function isRetryableExtractionError(error) {
+  const detail = `${error?.stderr || ''}\n${error?.message || ''}`;
+  return /unable to extract universal data|unexpected response|timed? out|connection reset|HTTP Error (?:429|5\d\d)/i.test(detail);
+}
+
 /**
  * Fetches video metadata and available formats for a given URL
  * without downloading anything. Works for any site yt-dlp supports
@@ -42,18 +59,19 @@ export function normalizeFormats(formats) {
  */
 export async function extractFormats(url, options = {}) {
   let info;
-  try {
-    info = await youtubedl(url, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noCheckCertificates: true,
-      preferFreeFormats: true,
-      flatPlaylist: true,
-      proxy: options.proxy,
-      ...getYtDlpRuntimeOptions(),
-    });
-  } catch (err) {
-    const detail = err.stderr ? `\n${err.stderr.trim()}` : err.message;
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      info = await youtubedl(url, getExtractOptions(options));
+      break;
+    } catch (err) {
+      lastError = err;
+      if (attempt === 2 || !isRetryableExtractionError(err)) break;
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  if (!info && lastError) {
+    const detail = lastError.stderr ? `\n${lastError.stderr.trim()}` : lastError.message;
     throw new Error(`Could not read this URL.${detail}`);
   }
 

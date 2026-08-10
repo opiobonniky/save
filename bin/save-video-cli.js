@@ -12,6 +12,7 @@ import { checkDependencies } from '../src/checkDeps.js';
 import { getConfig } from '../src/config.js';
 import {
   isLikelyPlaylistUrl,
+  normalizeMediaUrl,
   parseCount,
   parseProxy,
   resolveQualitySelector,
@@ -218,6 +219,7 @@ function ensureOutputDir(outputDir) {
 }
 
 async function run(url, outputDirArg, options) {
+  url = normalizeMediaUrl(url);
   const operationStartedAt = Date.now();
   if (!getYtDlpExecutablePath()) await ensureManagedYtDlp();
   if (!getFfmpegExecutablePath()) await ensureManagedFfmpeg();
@@ -243,8 +245,9 @@ async function run(url, outputDirArg, options) {
     proxy,
   };
 
+  const likelyPlaylist = isLikelyPlaylistUrl(url);
   const needsMetadata =
-    options.choose || options.listFormats || options.format || options.playlist || isLikelyPlaylistUrl(url);
+    options.choose || options.listFormats || options.format || options.playlist || likelyPlaylist;
 
   if (!needsMetadata) {
     checkDependencies({ requireFfmpeg: true });
@@ -258,7 +261,7 @@ async function run(url, outputDirArg, options) {
   }
 
   console.log(chalk.blue('Fetching video info...'));
-  const result = await extractFormats(url, { proxy });
+  const result = await extractFormats(url, { proxy, flatPlaylist: likelyPlaylist });
   downloadOpts.preflightSeconds = (Date.now() - operationStartedAt) / 1000;
   console.log(chalk.green(`Found: ${result.title}`));
 
@@ -272,7 +275,7 @@ async function run(url, outputDirArg, options) {
   if (options.listFormats) {
     console.log(
       chalk.bold(
-        `\n${'ID'.padEnd(10)}${'Ext'.padEnd(8)}${'Quality'.padEnd(12)}${'Size'.padEnd(10)}${'Type'.padEnd(14)}Note`
+        `\n${'ID'.padEnd(24)}${'Ext'.padEnd(8)}${'Quality'.padEnd(12)}${'Size'.padEnd(10)}${'Type'.padEnd(14)}Note`
       )
     );
     formats.forEach(f => console.log(formatRow(f)));
