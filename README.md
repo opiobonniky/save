@@ -11,8 +11,11 @@ which does the actual site-specific extraction work.
 - **Playlists.** Paste a playlist URL and choose to download the whole thing
   or pick specific videos from an interactive checklist.
 - **Batch mode.** `download-me --batch urls.txt` downloads every URL in a
-  text file (one per line, `#` for comments), non-interactively, with a
-  pass/fail summary at the end.
+  text file (one per line, `#` for comments), with bounded `--jobs` concurrency.
+- **Fast direct-video path.** Normal downloads skip the duplicate metadata
+  request; full extraction only runs for format picking and playlists.
+- **Quality presets.** Balanced 1080p is the default, with 360p through 2160p
+  and unlimited `best` available through `--quality`.
 - **Saved defaults.** `download-me config set outputDir ~/Videos` remembers
   a default output directory (and default subtitle language) across runs.
   `download-me config get` / `config reset` to inspect or clear.
@@ -34,7 +37,7 @@ npm test
 
 Runs the automated suite (`node --test`) covering the pure logic that
 doesn't need network access: format detection/merging decisions, playlist
-entry URL resolution, and batch-file parsing. A CI workflow
+index resolution, quality presets, URL classification, and batch parsing. A CI workflow
 (`.github/workflows/ci.yml`) runs this on every push and builds release
 artifacts on tagged versions.
 
@@ -46,7 +49,7 @@ real URL (see Known limitations).
 
 
 `download-me` uses yt-dlp's native concurrent-fragment downloader by default
-(`--concurrent-fragments 8`). It starts faster, reports progress more often,
+(`--concurrent-fragments 4`, configurable with `--connections`). It starts faster, reports progress more often,
 and works particularly well for the DASH/HLS streams used by YouTube.
 
 For a large direct file, opt in to aria2c's multi-connection downloader:
@@ -57,6 +60,7 @@ download-me <url> --aria2
 
 aria2c can improve throughput when connection count is the bottleneck, but it
 has a slower startup phase and some platforms rate-limit its parallel requests.
+The CLI uses the same moderate connection count for aria2 rather than forcing 16.
 
 ## Installation
 
@@ -76,6 +80,9 @@ On Debian or Ubuntu, install the external media tools once:
 sudo apt update
 sudo apt install ffmpeg aria2
 ```
+
+For full YouTube support, install the recommended Deno runtime from
+[deno.com](https://deno.com/) and confirm it with `download-me doctor`.
 
 The npm installation does not run `sudo` or modify system packages behind the
 scenes. The npm dependency manages its own `yt-dlp` copy. `aria2` is optional,
@@ -143,7 +150,14 @@ bash install-standalone.sh
 - `yt-dlp` available on `PATH` for standalone and Debian installations; npm
   installations receive a managed copy automatically
 - `ffmpeg` for merging video and audio or producing MP3 files
+- Deno 2.3+ (recommended) or Node.js 22+ for full YouTube JavaScript challenge support
 - `aria2c` optional for multi-connection acceleration (`aria2` package on apt)
+
+Check the installed runtime at any time:
+
+```bash
+download-me doctor
+```
 
 ## Uninstalling
 
@@ -171,8 +185,12 @@ System media tools are left installed because other applications may use them.
 ## Usage
 
 ```bash
-# Zero-decision default: best quality, no prompts, no menu — paste and go
+# Zero-decision default: balanced 1080p, one extraction, no menu
 download-me https://youtube.com/watch?v=xyz
+
+# Select a quality preset, including unlimited best quality
+download-me https://youtube.com/watch?v=xyz --quality 720p
+download-me https://youtube.com/watch?v=xyz --quality best
 
 # Want control over the exact format instead? Opt in explicitly:
 download-me https://youtube.com/watch?v=xyz --choose
@@ -195,14 +213,21 @@ download-me https://youtube.com/watch?v=xyz --list-formats
 # Playlist — prompts to download all or pick specific videos
 download-me https://youtube.com/playlist?list=xyz
 
-# Batch mode — every URL in a text file, non-interactive
-download-me --batch urls.txt ~/Videos
+# Batch mode with two simultaneous downloads
+download-me --batch urls.txt ~/Videos --jobs 2
 
 # Force a fresh download even if the file already exists
 download-me https://youtube.com/watch?v=xyz --overwrite
 
 # Opt in to aria2c for a large direct file (slower startup)
-download-me https://youtube.com/watch?v=xyz --aria2
+download-me https://youtube.com/watch?v=xyz --aria2 --connections 4
+
+# Print startup, transfer, processing, and total timings
+download-me https://youtube.com/watch?v=xyz --timing
+
+# Save performance defaults
+download-me config set quality 720p
+download-me config set connections 4
 ```
 
 A desktop notification fires automatically when a download finishes. Click it
@@ -235,24 +260,14 @@ download-me/
 
 ## How it works
 
-1. `extract.js` calls yt-dlp to fetch metadata + all available formats for the URL,
-   without downloading anything.
-2. If `--list-formats` was passed, the formats are printed and the tool exits.
-3. Otherwise, `prompt.js` shows an interactive list so you can pick a format
-   (unless `-f <formatId>` or `--audio` was passed, which skips the picker).
-4. `download.js` runs the actual download via yt-dlp, parsing its progress output
+1. Ordinary video and audio downloads go directly to yt-dlp, avoiding a duplicate
+   metadata extraction before transfer starts.
+2. `--choose`, `--list-formats`, and playlist URLs use `extract.js`; playlists
+   use flat metadata and selected playlist indices rather than extracting every entry.
+3. `prompt.js` shows the format or playlist picker only when interaction is needed.
+4. `download.js` runs the download, parsing its progress output
    into a live terminal progress bar, and saves the file into the resolved output
    directory (current directory by default, or the trailing path argument).
-
-## Ideas for extending this
-
-- **Batch mode**: accept a `.txt` file of URLs and loop through downloads
-- **Playlist support**: detect `isPlaylist` (already returned by `extractFormats`)
-  and prompt "download all vs pick one"
-- **Persistent config**: use a package like `conf` to remember a preferred default
-  output directory or format across runs
-- **Auto-update yt-dlp**: since sites change often, periodically run `yt-dlp -U`
-  so extraction keeps working
 
 ## A note on responsible use
 

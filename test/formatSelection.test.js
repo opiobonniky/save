@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { resolveQualitySelector } from '../src/options.js';
 
 // Mirrors the exact format-selection decision logic in bin/download-me.js's
 // run(). Kept as a standalone pure function so the "zero-decision by default"
@@ -9,14 +10,19 @@ import assert from 'node:assert/strict';
 function decideFormatId(options) {
   if (options.format) return { formatId: options.format, usedPicker: false };
   if (options.choose) return { formatId: null, usedPicker: true }; // caller would show the picker
-  return { formatId: 'bestvideo+bestaudio/best', usedPicker: false };
+  return { formatId: resolveQualitySelector(options.quality), usedPicker: false };
 }
 
 describe('format selection defaults', () => {
-  test('with no flags at all, defaults to best quality with no picker', () => {
+  test('with no flags at all, defaults to balanced 1080p with no picker', () => {
     const { formatId, usedPicker } = decideFormatId({});
-    assert.equal(formatId, 'bestvideo+bestaudio/best');
+    assert.equal(formatId, 'bestvideo[height<=1080]+bestaudio/best[height<=1080]');
     assert.equal(usedPicker, false);
+  });
+
+  test('--quality best restores unlimited quality', () => {
+    const { formatId } = decideFormatId({ quality: 'best' });
+    assert.equal(formatId, 'bestvideo+bestaudio/best');
   });
 
   test('-f/--format always wins and skips the picker', () => {

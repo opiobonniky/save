@@ -10,6 +10,13 @@ import { downloadVideo, downloadPlaylist } from '../src/download.js';
 import { formatRow, isVideoOnly } from '../src/formatUtils.js';
 import { checkDependencies } from '../src/checkDeps.js';
 import { getConfig } from '../src/config.js';
+import {
+  isLikelyPlaylistUrl,
+  parseCount,
+  resolveQualitySelector,
+} from '../src/options.js';
+import { getRuntimeDiagnostics } from '../src/runtime.js';
+import { parseBatchLines, runWorkerPool } from '../src/batch.js';
 
 const program = new Command();
 
@@ -20,12 +27,17 @@ program
   .argument('[url]', 'video or playlist URL')
   .argument('[outputDir]', 'directory to save the video (defaults to current directory)')
   .option('-f, --format <formatId>', 'skip picker, use specific format id')
-  .option('--choose', 'show the interactive format picker (default: best quality, no prompt)')
+  .option('-q, --quality <preset>', 'quality preset: 360p, 480p, 720p, 1080p, 1440p, 2160p, best')
+  .option('--choose', 'show the interactive format picker instead of using a quality preset')
   .option('--audio', 'download audio only, converted to mp3 (requires ffmpeg)')
   .option('--list-formats', 'just list available formats, do not download')
   .option('--overwrite', 'force re-download even if the file already exists')
   .option('--subs [langs]', 'download subtitles (default language: en; comma-separate for more)')
   .option('--aria2', 'use aria2c acceleration (more connections, but slower startup)')
+  .option('-N, --connections <count>', 'fragment or aria2 connection count (1-16)')
+  .option('-j, --jobs <count>', 'parallel batch downloads (1-4)', '1')
+  .option('--timing', 'print startup, transfer, processing, and total times')
+  .option('--playlist', 'force interactive playlist discovery')
   .option('--batch <file>', 'download every URL listed in a text file (one per line)')
   .action(async (url, outputDir, options) => {
     try {
@@ -64,7 +76,13 @@ configCmd
       console.error(chalk.red(`Unknown config key "${key}". Known keys: ${Object.keys(cfg.store).join(', ')}`));
       process.exit(1);
     }
-    cfg.set(key, key === 'outputDir' ? path.resolve(value.replace(/^~/, process.env.HOME || '~')) : value);
+    if (key === 'quality') resolveQualitySelector(value);
+    const storedValue = key === 'outputDir'
+      ? path.resolve(value.replace(/^~/, process.env.HOME || '~'))
+      : key === 'connections'
+        ? parseCount(value, 'connections')
+        : value;
+    cfg.set(key, storedValue);
     console.log(chalk.green(`Set ${key} = ${cfg.get(key)}`));
   });
 
@@ -74,6 +92,25 @@ configCmd
   .action(() => {
     getConfig().clear();
     console.log(chalk.green('Config reset.'));
+  });
+
+program
+  .command('doctor')
+  .description('check downloader dependencies and YouTube runtime support')
+  .action(() => {
+    const diagnostics = getRuntimeDiagnostics();
+    console.log(`yt-dlp: ${diagnostics.ytDlp || 'missing'}`);
+    console.log(`ffmpeg: ${diagnostics.ffmpeg || 'missing'}`);
+    console.log(`aria2c: ${diagnostics.aria2c || 'not installed (optional)'}`);
+    console.log(`Deno: ${diagnostics.deno || 'not installed'}`);
+    console.log(`Node.js: ${diagnostics.node || 'missing'}`);
+    if (diagnostics.javascriptReady) {
+      console.log(chalk.green('YouTube JavaScript runtime: ready'));
+    } else {
+      console.log(chalk.yellow('YouTube JavaScript runtime: unavailable'));
+      console.log('Install Deno 2.3+ (recommended) or use Node.js 22+.');
+      process.exitCode = 1;
+    }
   });
 
 async function resolveOutputDir(outputDirArg) {
@@ -101,13 +138,44 @@ function ensureOutputDir(outputDir) {
 }
 
 async function run(url, outputDirArg, options) {
+  const operationStartedAt = Date.now();
   checkDependencies({ requireFfmpeg: false });
 
   const outputDir = await resolveOutputDir(outputDirArg);
   ensureOutputDir(outputDir);
 
+  const cfg = getConfig();
+  const quality = options.quality || cfg.get('quality') || '1080p';
+  const qualitySelector = resolveQualitySelector(quality);
+  const connections = parseCount(options.connections || cfg.get('connections') || 4, 'connections');
+  const downloadOpts = {
+    audio: !!options.audio,
+    overwrite: !!options.overwrite,
+    subs: !!options.subs,
+    subLangs: typeof options.subs === 'string' ? options.subs : cfg.get('subLangs'),
+    aria2: !!options.aria2,
+    connections,
+    timing: !!options.timing,
+    noProgress: !!options.noProgress,
+  };
+
+  const needsMetadata =
+    options.choose || options.listFormats || options.format || options.playlist || isLikelyPlaylistUrl(url);
+
+  if (!needsMetadata) {
+    checkDependencies({ requireFfmpeg: true });
+    console.log(chalk.gray(options.audio ? 'Using best available audio.' : `Using ${quality} quality.`));
+    console.log(chalk.gray(`Saving to: ${outputDir}`));
+    await downloadVideo(url, options.audio ? 'bestaudio' : qualitySelector, outputDir, {
+      ...downloadOpts,
+      noPlaylist: true,
+    });
+    return;
+  }
+
   console.log(chalk.blue('Fetching video info...'));
   const result = await extractFormats(url);
+  downloadOpts.preflightSeconds = (Date.now() - operationStartedAt) / 1000;
   console.log(chalk.green(`Found: ${result.title}`));
 
   if (result.isPlaylist) {
@@ -127,14 +195,6 @@ async function run(url, outputDirArg, options) {
     return;
   }
 
-  const downloadOpts = {
-    audio: !!options.audio,
-    overwrite: !!options.overwrite,
-    subs: !!options.subs,
-    subLangs: typeof options.subs === 'string' ? options.subs : getConfig().get('subLangs'),
-    aria2: !!options.aria2,
-  };
-
   if (options.audio) {
     checkDependencies({ requireFfmpeg: true });
     console.log(chalk.gray(`Saving to: ${outputDir}`));
@@ -150,8 +210,8 @@ async function run(url, outputDirArg, options) {
       // Zero-decision default: best available quality, no prompt at all.
       // This is what makes "paste a link, hit enter" actually work end to
       // end without a menu of format IDs blocking the common case.
-      formatId = 'bestvideo+bestaudio/best';
-      console.log(chalk.gray('Using best available quality (pass --choose to pick a format instead).'));
+      formatId = qualitySelector;
+      console.log(chalk.gray(`Using ${quality} quality (pass --choose to pick a format instead).`));
     }
   }
 
@@ -180,7 +240,7 @@ async function handlePlaylist(url, result, outputDir, options) {
   if (options.batchMode) {
     console.log(chalk.gray('Batch mode: downloading entire playlist automatically.'));
     console.log(chalk.gray(`Saving to: ${outputDir}`));
-    await downloadPlaylist(url, outputDir, { audio: !!options.audio, aria2: !!options.aria2 });
+    await downloadPlaylist(url, outputDir, getPlaylistOptions(options));
     return;
   }
 
@@ -198,7 +258,7 @@ async function handlePlaylist(url, result, outputDir, options) {
 
   if (choice === 'all') {
     console.log(chalk.gray(`Saving to: ${outputDir}`));
-    await downloadPlaylist(url, outputDir, { audio: !!options.audio, aria2: !!options.aria2 });
+    await downloadPlaylist(url, outputDir, getPlaylistOptions(options));
     return;
   }
 
@@ -207,7 +267,7 @@ async function handlePlaylist(url, result, outputDir, options) {
       type: 'checkbox',
       name: 'selected',
       message: 'Select videos to download:',
-      choices: result.entries.map(e => ({ name: e.title, value: e.url })),
+      choices: result.entries.map(e => ({ name: e.title, value: e.index })),
       pageSize: 15,
     },
   ]);
@@ -217,14 +277,23 @@ async function handlePlaylist(url, result, outputDir, options) {
     return;
   }
 
-  for (const entryUrl of selected) {
-    console.log(chalk.cyan(`\n--- ${entryUrl} ---`));
-    try {
-      await run(entryUrl, outputDir, options);
-    } catch (err) {
-      console.error(chalk.red(`Skipped (error): ${err.message}`));
-    }
-  }
+  console.log(chalk.gray(`Saving ${selected.length} selected video(s) to: ${outputDir}`));
+  await downloadPlaylist(url, outputDir, { ...getPlaylistOptions(options), playlistItems: selected });
+}
+
+function getPlaylistOptions(options) {
+  const cfg = getConfig();
+  const quality = options.quality || cfg.get('quality') || '1080p';
+  return {
+    audio: !!options.audio,
+    aria2: !!options.aria2,
+    format: resolveQualitySelector(quality),
+    connections: parseCount(options.connections || cfg.get('connections') || 4, 'connections'),
+    overwrite: !!options.overwrite,
+    subs: !!options.subs,
+    subLangs: typeof options.subs === 'string' ? options.subs : cfg.get('subLangs'),
+    noProgress: !!options.noProgress,
+  };
 }
 
 async function runBatch(batchFile, outputDirArg, options) {
@@ -233,39 +302,32 @@ async function runBatch(batchFile, outputDirArg, options) {
     throw new Error(`Batch file not found: ${resolvedBatchFile}`);
   }
 
-  const lines = fs
-    .readFileSync(resolvedBatchFile, 'utf-8')
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('#'));
+  const lines = parseBatchLines(fs.readFileSync(resolvedBatchFile, 'utf-8'));
 
   if (lines.length === 0) {
     throw new Error('Batch file is empty (or only contains comments).');
   }
 
-  console.log(chalk.cyan(`Batch mode: ${lines.length} URL(s) to process.`));
+  const jobs = parseCount(options.jobs || 1, 'jobs', { max: 4 });
+  console.log(chalk.cyan(`Batch mode: ${lines.length} URL(s), ${jobs} worker(s).`));
 
   let succeeded = 0;
   let failed = 0;
 
-  for (let i = 0; i < lines.length; i++) {
-    const url = lines[i];
+  await runWorkerPool(lines, jobs, async (url, i) => {
     console.log(chalk.cyan(`\n[${i + 1}/${lines.length}] ${url}`));
     try {
-      // Batch mode always uses -f/--audio non-interactively if provided;
-      // otherwise defaults to best combined quality to avoid blocking on prompts.
-      const batchOptions = {
+      await run(url, outputDirArg, {
         ...options,
-        format: options.format || 'bestvideo+bestaudio/best',
         batchMode: true,
-      };
-      await run(url, outputDirArg, batchOptions);
+        noProgress: jobs > 1,
+      });
       succeeded++;
     } catch (err) {
-      console.error(chalk.red(`Failed: ${err.message}`));
+      console.error(chalk.red(`[${i + 1}/${lines.length}] Failed: ${err.message}`));
       failed++;
     }
-  }
+  });
 
   console.log(chalk.bold(`\nBatch complete: ${succeeded} succeeded, ${failed} failed.`));
 }

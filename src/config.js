@@ -10,6 +10,8 @@ const config = new Conf({
   defaults: {
     outputDir: null,   // null = fall back to cwd/trailing-arg behavior
     subLangs: 'en',
+    quality: '1080p',
+    connections: 4,
   },
 });
 

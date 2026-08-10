@@ -65,7 +65,17 @@ ensure_dep ffmpeg
 
 echo ""
 echo "Checking optional speed booster..."
-ensure_dep aria2c aria2   # optional: enables multi-connection downloads for much faster speeds
+ensure_dep aria2c aria2   # optional: multi-connection mode for large direct files
+
+echo ""
+echo "Checking YouTube JavaScript runtime..."
+if command_exists deno; then
+  echo -e "${GREEN}✓ Deno runtime available${RESET}"
+elif command_exists node && [ "$(node -p 'Number(process.versions.node.split(".")[0])')" -ge 22 ]; then
+  echo -e "${GREEN}✓ Node.js 22+ runtime available${RESET}"
+else
+  echo -e "${YELLOW}⚠ Install Deno 2.3+ for full YouTube support: https://deno.com/${RESET}"
+fi
 
 echo ""
 echo -e "${GREEN}Setup complete.${RESET} You can now run: download-me <url>"

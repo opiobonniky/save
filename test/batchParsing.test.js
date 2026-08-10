@@ -1,13 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-
-// Mirrors the exact line-parsing logic in bin/download-me.js's runBatch().
-function parseBatchLines(fileContent) {
-  return fileContent
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('#'));
-}
+import { parseBatchLines, runWorkerPool } from '../src/batch.js';
 
 describe('batch file parsing', () => {
   test('skips comment lines starting with #', () => {
@@ -28,5 +21,24 @@ describe('batch file parsing', () => {
   test('returns empty array for a fully-commented file', () => {
     const lines = parseBatchLines('# only comments\n# nothing else');
     assert.deepEqual(lines, []);
+  });
+});
+
+describe('batch worker pool', () => {
+  test('processes each item once with bounded concurrency', async () => {
+    let active = 0;
+    let maximumActive = 0;
+    const processed = [];
+
+    await runWorkerPool(['a', 'b', 'c', 'd'], 2, async item => {
+      active++;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      processed.push(item);
+      active--;
+    });
+
+    assert.equal(maximumActive, 2);
+    assert.deepEqual(processed.sort(), ['a', 'b', 'c', 'd']);
   });
 });

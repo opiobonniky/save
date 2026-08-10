@@ -1,4 +1,16 @@
 import { youtubedl } from './ytdlp.js';
+import { getYtDlpRuntimeOptions } from './runtime.js';
+
+export function resolvePlaylistEntries(rawEntries) {
+  const entries = rawEntries
+    .map((entry, index) => entry && ({
+      id: entry.id,
+      title: entry.title || entry.id || 'Untitled',
+      index: entry.playlist_index || index + 1,
+    }))
+    .filter(Boolean);
+  return { entries, skipped: rawEntries.length - entries.length };
+}
 
 /**
  * Fetches video metadata and available formats for a given URL
@@ -17,11 +29,8 @@ export async function extractFormats(url) {
       noWarnings: true,
       noCheckCertificates: true,
       preferFreeFormats: true,
-      // Deliberately NOT using --flat-playlist: with it, yt-dlp often gives
-      // just a bare video ID as `url` with no `webpage_url`, which produces
-      // unusable, unfetchable "URLs" for playlist entries. Full extraction
-      // is slower for large playlists but reliably gives a real webpage_url
-      // for every entry across extractors (YouTube, TikTok, etc).
+      flatPlaylist: true,
+      ...getYtDlpRuntimeOptions(),
     });
   } catch (err) {
     const detail = err.stderr ? `\n${err.stderr.trim()}` : err.message;
@@ -34,18 +43,10 @@ export async function extractFormats(url) {
 
   if (info._type === 'playlist' || Array.isArray(info.entries)) {
     const rawEntries = info.entries || [];
-    const entries = rawEntries
-      .filter(e => e && (e.webpage_url || e.original_url || (typeof e.url === 'string' && e.url.startsWith('http'))))
-      .map(e => ({
-        id: e.id,
-        title: e.title || e.id || 'Untitled',
-        url: e.webpage_url || e.original_url || e.url,
-      }));
-
-    const skipped = rawEntries.length - entries.length;
+    const { entries, skipped } = resolvePlaylistEntries(rawEntries);
     if (skipped > 0) {
       console.error(
-        `Note: ${skipped} playlist entr${skipped === 1 ? 'y was' : 'ies were'} skipped (unavailable or no resolvable URL, e.g. deleted/private videos).`
+        `Note: ${skipped} unavailable playlist entr${skipped === 1 ? 'y was' : 'ies were'} skipped.`
       );
     }
 
@@ -75,6 +76,7 @@ export async function extractFormats(url) {
       note: f.format_note || '',
       vcodec: f.vcodec,
       acodec: f.acodec,
+      protocol: f.protocol,
     })),
   };
 }

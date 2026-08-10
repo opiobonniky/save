@@ -1,9 +1,10 @@
-import { youtubedl } from './ytdlp.js';
+import { spawnYtDlp } from './ytdlp.js';
 import cliProgress from 'cli-progress';
 import path from 'path';
 import { execSync } from 'child_process';
 import { notifyDone } from './notify.js';
 import { parseProgressEvents } from './progress.js';
+import { getYtDlpRuntimeOptions } from './runtime.js';
 
 function commandExists(cmd) {
   try {
@@ -12,6 +13,23 @@ function commandExists(cmd) {
   } catch {
     return false;
   }
+}
+
+function createProgressBar(options, preset, disabled) {
+  if (!disabled) return new cliProgress.SingleBar(options, preset);
+  return {
+    value: 0,
+    payload: {},
+    start(total, value, payload = {}) {
+      this.value = value;
+      this.payload = payload;
+    },
+    update(value, payload = {}) {
+      if (typeof value === 'number') this.value = value;
+      Object.assign(this.payload, payload);
+    },
+    stop() {},
+  };
 }
 
 /**
@@ -37,17 +55,23 @@ function commandExists(cmd) {
  * @param {boolean} opts.subs       - download subtitles alongside the video
  * @param {string}  opts.subLangs   - subtitle language codes, e.g. "en,es" (default: "en")
  * @param {boolean} opts.aria2      - opt in to aria2c multi-connection downloading
+ * @param {number} opts.connections - fragment/aria2 connection count
+ * @param {boolean} opts.timing     - print phase timings after completion
  */
 export async function downloadVideo(url, formatId, outputDir, opts = {}) {
-  const bar = new cliProgress.SingleBar(
+  const startedAt = Date.now();
+  let firstProgressAt = null;
+  let processingStartedAt = null;
+  const bar = createProgressBar(
     {
       format: 'Downloading |{bar}| {percentage}% | {speed} | {status}',
       hideCursor: true,
-      fps: 20,
+      fps: 10,
       synchronousUpdate: true,
       forceRedraw: true,
     },
-    cliProgress.Presets.shades_classic
+    cliProgress.Presets.shades_classic,
+    opts.noProgress
   );
 
   const preparationStartedAt = Date.now();
@@ -76,16 +100,20 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     mergeOutputFormat: 'mp4',
     retries: 10, // auto-retry transient network failures instead of failing immediately
     fragmentRetries: 10,
-    progressDelta: 0.1,
+    progressDelta: 0.25,
+    ...getYtDlpRuntimeOptions(),
   };
 
+  if (opts.noPlaylist) ytdlOptions.noPlaylist = true;
+
   const usingAria2c = opts.aria2 && commandExists('aria2c');
+  const connections = opts.connections || 4;
 
   if (usingAria2c) {
     ytdlOptions.externalDownloader = 'aria2c';
-    ytdlOptions.externalDownloaderArgs = 'aria2c:-x16 -s16 -k1M -j16';
+    ytdlOptions.externalDownloaderArgs = `aria2c:-x${connections} -s${connections} -k4M`;
   } else {
-    ytdlOptions.concurrentFragments = 8;
+    ytdlOptions.concurrentFragments = connections;
   }
 
   if (opts.audio) {
@@ -104,7 +132,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     ytdlOptions.convertSubs = 'srt';
   }
 
-  const subprocess = youtubedl.exec(url, ytdlOptions);
+  const { subprocess, completion } = spawnYtDlp(url, ytdlOptions);
 
   let stderrBuffer = '';
   let sawAlreadyDownloaded = false;
@@ -116,6 +144,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     if (/temporary cookies file/i.test(line)) preparationPhase = 'Starting aria2c';
     if (/\[(?:Merger|ExtractAudio)\]/i.test(line)) {
       progressStarted = true;
+      processingStartedAt ||= Date.now();
       bar.update(bar.value, { status: 'Processing final file' });
     }
   };
@@ -124,6 +153,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     const events = parseProgressEvents(data.toString());
     for (const event of events) {
       progressStarted = true;
+      firstProgressAt ||= Date.now();
       bar.update(event.percentage, {
         speed: event.speed || bar.payload.speed || 'calculating...',
         status: 'Transferring',
@@ -153,13 +183,13 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
 
   subprocess.stderr.on('data', (data) => {
     const line = data.toString();
-    stderrBuffer += line;
+    stderrBuffer = `${stderrBuffer}${line}`.slice(-65536);
     updatePhase(line);
     updateProgress(data);
   });
 
   try {
-    await subprocess;
+    await completion;
   } catch (err) {
     clearInterval(preparationTimer);
     bar.stop();
@@ -188,6 +218,19 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
   }
 
   console.log(`\nDone. Saved to: ${outputDir}${usingAria2c ? ' (accelerated via aria2c)' : ''}`);
+  if (opts.timing) {
+    const finishedAt = Date.now();
+    const startupSeconds = ((firstProgressAt || finishedAt) - startedAt) / 1000;
+    const transferEnd = processingStartedAt || finishedAt;
+    const transferSeconds = firstProgressAt ? (transferEnd - firstProgressAt) / 1000 : 0;
+    const processingSeconds = processingStartedAt ? (finishedAt - processingStartedAt) / 1000 : 0;
+    const preflightSeconds = opts.preflightSeconds || 0;
+    console.log(
+      `Timing: preflight ${preflightSeconds.toFixed(2)}s, startup ${startupSeconds.toFixed(2)}s, ` +
+        `transfer ${transferSeconds.toFixed(2)}s, processing ${processingSeconds.toFixed(2)}s, ` +
+        `total ${(preflightSeconds + (finishedAt - startedAt) / 1000).toFixed(2)}s`
+    );
+  }
   notifyDone('Download complete', `Saved to ${outputDir}`, outputDir);
   return { skipped: false };
 }
@@ -204,12 +247,13 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
  * @param {boolean} opts.aria2 - opt in to aria2c multi-connection downloading
  */
 export async function downloadPlaylist(url, outputDir, opts = {}) {
-  const bar = new cliProgress.SingleBar(
+  const bar = createProgressBar(
     {
       format: 'Playlist |{bar}| {percentage}% | {status}',
       hideCursor: true,
     },
-    cliProgress.Presets.shades_classic
+    cliProgress.Presets.shades_classic,
+    opts.noProgress
   );
   bar.start(100, 0, { status: 'starting...' });
 
@@ -225,14 +269,24 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     fragmentRetries: 10,
     yesPlaylist: true,
     ignoreErrors: true, // one broken video in a playlist shouldn't abort the whole batch
-    format: opts.audio ? 'bestaudio' : 'bestvideo+bestaudio/best',
+    format: opts.audio ? 'bestaudio' : opts.format || 'bestvideo+bestaudio/best',
+    concurrentFragments: opts.connections || 4,
+    ...getYtDlpRuntimeOptions(),
   };
 
+  if (opts.playlistItems?.length) ytdlOptions.playlistItems = opts.playlistItems.join(',');
+  if (opts.overwrite) ytdlOptions.forceOverwrites = true;
+  if (opts.subs) {
+    ytdlOptions.writeSubs = true;
+    ytdlOptions.writeAutoSubs = true;
+    ytdlOptions.subLangs = opts.subLangs || 'en';
+    ytdlOptions.convertSubs = 'srt';
+  }
+
   if (opts.aria2 && commandExists('aria2c')) {
+    const connections = opts.connections || 4;
     ytdlOptions.externalDownloader = 'aria2c';
-    ytdlOptions.externalDownloaderArgs = 'aria2c:-x16 -s16 -k1M -j16';
-  } else {
-    ytdlOptions.concurrentFragments = 8;
+    ytdlOptions.externalDownloaderArgs = `aria2c:-x${connections} -s${connections} -k4M`;
   }
 
   if (opts.audio) {
@@ -240,7 +294,7 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     ytdlOptions.audioFormat = 'mp3';
   }
 
-  const subprocess = youtubedl.exec(url, ytdlOptions);
+  const { subprocess, completion } = spawnYtDlp(url, ytdlOptions);
 
   let stderrBuffer = '';
   let currentItem = 0;
@@ -260,11 +314,11 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
   });
 
   subprocess.stderr.on('data', (data) => {
-    stderrBuffer += data.toString();
+    stderrBuffer = `${stderrBuffer}${data.toString()}`.slice(-65536);
   });
 
   try {
-    await subprocess;
+    await completion;
   } catch (err) {
     bar.stop();
     const detail = stderrBuffer.trim() || err.message;
