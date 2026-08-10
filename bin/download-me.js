@@ -17,6 +17,7 @@ import {
 } from '../src/options.js';
 import { getRuntimeDiagnostics } from '../src/runtime.js';
 import { parseBatchLines, runWorkerPool } from '../src/batch.js';
+import { VERSION } from '../src/version.js';
 
 const program = new Command();
 
@@ -24,7 +25,7 @@ program
   .name('download-me')
   .description('Fast, friendly video and audio downloads powered by yt-dlp')
   .usage('[options] <url> [outputDir]\n       download-me --batch <file> [outputDir]\n       download-me <command>')
-  .version('1.0.1')
+  .version(VERSION)
   .showSuggestionAfterError()
   .showHelpAfterError()
   .configureHelp({ sortSubcommands: true })
@@ -142,10 +143,16 @@ program
   .description('check downloader dependencies and YouTube runtime support')
   .action(() => {
     const diagnostics = getRuntimeDiagnostics();
-    console.log(`yt-dlp: ${diagnostics.ytDlp || 'missing'}`);
-    console.log(`ffmpeg: ${diagnostics.ffmpeg || 'missing'}`);
+    console.log(
+      `yt-dlp: ${diagnostics.ytDlp || 'missing'}${diagnostics.ytDlpSource ? ` (${diagnostics.ytDlpSource})` : ''}`
+    );
+    console.log(
+      `ffmpeg: ${diagnostics.ffmpeg || 'missing'}${diagnostics.ffmpegSource ? ` (${diagnostics.ffmpegSource})` : ''}`
+    );
     console.log(`aria2c: ${diagnostics.aria2c || 'not installed (optional)'}`);
-    console.log(`Deno: ${diagnostics.deno || 'not installed'}`);
+    console.log(
+      `Deno: ${diagnostics.deno || 'not installed'}${diagnostics.denoSource ? ` (${diagnostics.denoSource})` : ''}`
+    );
     console.log(`Node.js: ${diagnostics.node || 'missing'}`);
     if (diagnostics.javascriptReady) {
       console.log(chalk.green('YouTube JavaScript runtime: ready'));

@@ -1,19 +1,11 @@
 import { spawnYtDlp } from './ytdlp.js';
 import cliProgress from 'cli-progress';
 import path from 'path';
-import { execSync } from 'child_process';
 import { notifyDone } from './notify.js';
 import { parseProgressEvents } from './progress.js';
 import { getYtDlpRuntimeOptions } from './runtime.js';
-
-function commandExists(cmd) {
-  try {
-    execSync(`command -v ${cmd}`, { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { getFfmpegOptions } from './ffmpeg.js';
+import { canRun } from './executables.js';
 
 function createProgressBar(options, preset, disabled) {
   if (!disabled) return new cliProgress.SingleBar(options, preset);
@@ -102,11 +94,12 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     fragmentRetries: 10,
     progressDelta: 0.25,
     ...getYtDlpRuntimeOptions(),
+    ...getFfmpegOptions(),
   };
 
   if (opts.noPlaylist) ytdlOptions.noPlaylist = true;
 
-  const usingAria2c = opts.aria2 && commandExists('aria2c');
+  const usingAria2c = opts.aria2 && canRun('aria2c');
   const connections = opts.connections || 4;
 
   if (usingAria2c) {
@@ -194,7 +187,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     clearInterval(preparationTimer);
     bar.stop();
     const hint = /ffmpeg/i.test(stderrBuffer)
-      ? '\n(This likely requires ffmpeg to merge/convert the file — install it and try again.)'
+      ? '\n(ffmpeg processing failed. Run download-me doctor and reinstall the package if ffmpeg is missing.)'
       : usingAria2c
         ? '\n(aria2c was used for this download — try again without it if this persists.)'
         : '';
@@ -272,6 +265,7 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     format: opts.audio ? 'bestaudio' : opts.format || 'bestvideo+bestaudio/best',
     concurrentFragments: opts.connections || 4,
     ...getYtDlpRuntimeOptions(),
+    ...getFfmpegOptions(),
   };
 
   if (opts.playlistItems?.length) ytdlOptions.playlistItems = opts.playlistItems.join(',');
@@ -283,7 +277,7 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     ytdlOptions.convertSubs = 'srt';
   }
 
-  if (opts.aria2 && commandExists('aria2c')) {
+  if (opts.aria2 && canRun('aria2c')) {
     const connections = opts.connections || 4;
     ytdlOptions.externalDownloader = 'aria2c';
     ytdlOptions.externalDownloaderArgs = `aria2c:-x${connections} -s${connections} -k4M`;

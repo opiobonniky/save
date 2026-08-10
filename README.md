@@ -66,36 +66,60 @@ The CLI uses the same moderate connection count for aria2 rather than forcing 16
 
 ## Installation
 
-### npm from GitHub
+### Dependency-free application
 
-Until the package is published to the npm registry, install it directly from
-GitHub:
+Download the archive for your computer from the
+[latest release](https://github.com/opiobonniky/download-me/releases/latest):
+
+| System | Archive |
+| --- | --- |
+| Linux x64 | `download-me-<version>-linux-x64.tar.gz` |
+| Windows x64 | `download-me-<version>-windows-x64.zip` |
+| macOS Intel | `download-me-<version>-macos-x64.tar.gz` |
+| macOS Apple silicon | `download-me-<version>-macos-arm64.tar.gz` |
+
+The archive contains the app runtime, standalone yt-dlp, ffmpeg, ffprobe, and
+Deno. It does not need Node.js, Python, npm, yt-dlp, ffmpeg, Deno, sudo, or a
+system package manager. Keep the `libexec` directory beside the main
+executable; the application resolves its private tools from there.
+
+On Linux or macOS, extract and run it in place:
 
 ```bash
-npm install -g github:opiobonniky/download-me
-download-me --version
+tar -xzf download-me-<version>-<platform>-<arch>.tar.gz
+cd download-me-<version>-<platform>-<arch>
+./download-me doctor
+./download-me <url>
 ```
 
-On Debian or Ubuntu, install the external media tools once:
+The extracted archive also includes an optional `install.sh`, which copies the
+whole self-contained application under `/usr/local` and adds the `download-me`
+command to `PATH`.
 
-```bash
-sudo apt update
-sudo apt install ffmpeg aria2
+On Windows, extract the ZIP and run these commands in PowerShell:
+
+```powershell
+.\download-me.exe doctor
+.\download-me.exe <url>
 ```
 
-For full YouTube support, install the recommended Deno runtime from
-[deno.com](https://deno.com/) and confirm it with `download-me doctor`.
+Windows SmartScreen and macOS Gatekeeper may warn because release files are not
+yet signed with paid platform certificates. Release builds are checksummed,
+and macOS executables receive an ad-hoc signature. Compare the archive against
+its adjacent `.sha256` file before running it.
 
-The npm installation does not run `sudo` or modify system packages behind the
-scenes. The npm dependency manages its own `yt-dlp` copy. `aria2` is optional,
-but it enables accelerated downloads through its `aria2c` command.
-
-After publishing the package with `npm publish`, the shorter registry command
-will work:
+### npm alternative
 
 ```bash
 npm install -g save-video-cli
+download-me --version
 ```
+
+The npm installation does not run `sudo` or modify system packages behind the
+scenes. npm installs managed copies of yt-dlp and ffmpeg. Unix npm installs
+also need Python 3 for the upstream yt-dlp executable, and full YouTube support
+needs Deno 2.3+ or Node.js 22+. Use the dependency-free archive if you do not
+want to install those runtimes. `aria2` remains optional acceleration.
 
 ### From a local checkout
 
@@ -113,7 +137,6 @@ The equivalent manual commands are:
 ```bash
 npm install
 npm install -g .
-npm run setup:linux
 ```
 
 If npm reports `EEXIST` for the `download-me` executable, an older global
@@ -147,23 +170,25 @@ For users to run `sudo apt install download-me` by package name, the generated
 `.deb` must first be published in a signed apt repository. A GitHub Release can
 host direct `.deb` downloads, but it is not itself an apt repository.
 
-### Standalone Linux binary
+### Build a dependency-free archive
 
-The standalone build includes Node.js and supports Linux x86_64:
+Run this on the target operating system and architecture:
 
 ```bash
 npm install
-npm run build:binary
-bash install-standalone.sh
+npm run build:standalone
 ```
+
+The builder downloads pinned yt-dlp and Deno releases, verifies their published
+SHA-256 checksums, copies native ffmpeg/ffprobe builds, tests the finished app
+with a restricted `PATH`, and writes the release archive under `dist/`.
 
 ## Requirements
 
-- Node.js 18 or newer for npm installations
-- `yt-dlp` available on `PATH` for standalone and Debian installations; npm
-  installations receive a managed copy automatically
-- `ffmpeg` for merging video and audio or producing MP3 files
-- Deno 2.3+ (recommended) or Node.js 22+ for full YouTube JavaScript challenge support
+- Dependency-free archives: no separately installed software
+- npm installations: Node.js 18+, plus Python 3 on Linux/macOS
+- Debian package: system `yt-dlp` and ffmpeg packages
+- npm/ Debian: Deno 2.3+ or Node.js 22+ for full YouTube JavaScript challenge support
 - `aria2c` optional for multi-connection acceleration (`aria2` package on apt)
 
 Check the installed runtime at any time:
@@ -186,14 +211,17 @@ System media tools are left installed because other applications may use them.
 
 ## Known limitations
 
-- **Video-only formats need ffmpeg.** Many high-resolution formats (1080p+ on
+- **Video-only formats use ffmpeg.** Many high-resolution formats (1080p+ on
   YouTube, for example) ship video and audio as separate streams. This tool
-  detects that automatically and merges in the best audio track for you.
+  detects that automatically and merges in the best audio track for you. npm
+  installations and dependency-free archives include ffmpeg; Debian uses the
+  system package.
 - **Progress percentage isn't shown for a small number of streams** (some
   live/unknown-size streams use a yt-dlp progress format with no percentage
   at all). The download still completes correctly and displays its live speed.
-- **The standalone binary is Linux x86_64 only.** The npm installation remains
-  available on other platforms supported by Node.js and the external tools.
+- **Linux archives require a reasonably current x64 glibc system.** They do not
+  require application packages, but the packaged runtime still relies on the
+  operating system's standard C runtime and kernel interfaces.
 
 ## Usage
 

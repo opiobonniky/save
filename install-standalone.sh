@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Installer for the STANDALONE binary — no Node.js required on this machine.
-# Run this from inside the extracted project folder: bash install-standalone.sh
+# Optional installer for an extracted Linux or macOS dependency-free archive.
 set -e
 
-BINARY="dist/download-me-linux"
-TARGET="/usr/local/bin/download-me"
+SOURCE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+TARGET_DIR="/usr/local/lib/download-me"
+TARGET_LINK="/usr/local/bin/download-me"
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
@@ -14,41 +14,35 @@ as_root() {
   elif command_exists sudo; then
     sudo "$@"
   else
-    echo "✗ Need root privileges to install to $TARGET, and 'sudo' isn't available."
-    echo "  Re-run this script as root, or install 'sudo' first."
+    echo "Root privileges are needed to install under /usr/local."
+    echo "You can run $SOURCE_DIR/download-me directly without installing it."
     exit 1
   fi
 }
 
-OS="$(uname -s)"
-ARCH="$(uname -m)"
-if [ "$OS" != "Linux" ] || [ "$ARCH" != "x86_64" ]; then
-  echo "✗ dist/download-me-linux is a Linux x86_64 binary — detected ${OS}/${ARCH}, which isn't supported."
-  echo "  Build one for your platform: npm run build:binary (see package.json 'pkg' targets)."
-  exit 1
+case "$(uname -s)" in
+  Linux|Darwin) ;;
+  *)
+    echo "This installer supports Linux and macOS. On Windows, run download-me.exe directly."
+    exit 1
+    ;;
+esac
+
+for executable in download-me libexec/yt-dlp libexec/ffmpeg libexec/ffprobe libexec/deno; do
+  if [ ! -x "$SOURCE_DIR/$executable" ]; then
+    echo "Missing bundled executable: $executable"
+    echo "Run this installer from inside an extracted dependency-free archive."
+    exit 1
+  fi
+done
+
+echo "Installing the self-contained download-me application..."
+as_root mkdir -p "$TARGET_DIR" /usr/local/bin
+if [ "$SOURCE_DIR" != "$TARGET_DIR" ]; then
+  as_root cp -R "$SOURCE_DIR/." "$TARGET_DIR/"
 fi
+as_root chmod +x "$TARGET_DIR/download-me" "$TARGET_DIR/libexec/"*
+as_root ln -sf "$TARGET_DIR/download-me" "$TARGET_LINK"
 
-if [ ! -f "$BINARY" ]; then
-  echo "Binary not found at $BINARY."
-  echo "Build it first with: npm run build:binary  (requires Node.js on the BUILD machine only)"
-  exit 1
-fi
-
-if [ "$(wc -c < "$BINARY")" -lt 1000000 ]; then
-  echo "✗ $BINARY looks incomplete or corrupted (too small). Rebuild it before installing."
-  exit 1
-fi
-
-echo "Installing download-me (standalone, no Node.js needed)..."
-
-as_root cp "$BINARY" "$TARGET"
-as_root chmod +x "$TARGET"
-
-echo "Installed to $TARGET"
-
-# Install yt-dlp and ffmpeg automatically, same as the npm path.
-bash "$(dirname "$0")/scripts/install-deps.sh"
-
-echo ""
-echo "Done. Try it from anywhere:"
-echo "  download-me <url>"
+echo "Installed to $TARGET_DIR"
+echo "Run: download-me <url>"

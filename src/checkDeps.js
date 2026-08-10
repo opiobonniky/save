@@ -1,14 +1,6 @@
-import { execSync } from 'child_process';
 import chalk from 'chalk';
-
-function commandExists(cmd) {
-  try {
-    execSync(`command -v ${cmd}`, { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { getFfmpegExecutablePath } from './ffmpeg.js';
+import { getYtDlpExecutablePath } from './ytdlp.js';
 
 /**
  * Defense-in-depth check, run every time the CLI starts.
@@ -20,16 +12,17 @@ function commandExists(cmd) {
  */
 export function checkDependencies({ requireFfmpeg = false } = {}) {
   const missing = [];
-  if (process.pkg && !commandExists('yt-dlp')) missing.push('yt-dlp');
-  if (requireFfmpeg && !commandExists('ffmpeg')) missing.push('ffmpeg');
+  if (!getYtDlpExecutablePath()) missing.push('yt-dlp');
+  if (requireFfmpeg && !getFfmpegExecutablePath()) missing.push('ffmpeg');
 
   if (missing.length > 0) {
+    const recovery = process.pkg
+      ? 'The application bundle is incomplete. Extract the full archive again and keep libexec beside download-me.'
+      : 'Reinstall save-video-cli so npm can restore its managed tools.';
     console.error(
       chalk.red(
         `\nMissing required tool(s): ${missing.join(', ')}\n` +
-          `These are normally installed automatically when download-me is installed.\n` +
-          `Install them manually and try again:\n` +
-          `  sudo apt install ${missing.join(' ')}\n`
+          `${recovery}\n`
       )
     );
     process.exit(1);

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Removes download-me. Does NOT remove yt-dlp/ffmpeg/aria2c, since those
-# are general-purpose tools the user may rely on for other things.
+# Removes a dependency-free standalone installation.
 set -e
 
-TARGET="/usr/local/bin/download-me"
+TARGET_DIR="/usr/local/lib/download-me"
+TARGET_LINK="/usr/local/bin/download-me"
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
@@ -13,18 +13,16 @@ as_root() {
   elif command_exists sudo; then
     sudo "$@"
   else
-    echo "✗ Need root privileges to remove $TARGET, and 'sudo' isn't available."
+    echo "Root privileges are needed to remove the installation."
     exit 1
   fi
 }
 
-if [ ! -f "$TARGET" ]; then
-  echo "download-me doesn't appear to be installed at $TARGET — nothing to do."
+if [ ! -e "$TARGET_LINK" ] && [ ! -d "$TARGET_DIR" ]; then
+  echo "download-me is not installed under /usr/local."
   exit 0
 fi
 
-as_root rm -f "$TARGET"
-echo "Removed $TARGET."
-echo ""
-echo "yt-dlp, ffmpeg, and aria2c were left installed, since other tools may use them."
-echo "Remove them manually if you no longer need them, e.g.: sudo apt remove yt-dlp ffmpeg aria2"
+as_root rm -f "$TARGET_LINK"
+as_root rm -rf "$TARGET_DIR"
+echo "Removed download-me and its bundled tools."
