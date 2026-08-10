@@ -162,7 +162,7 @@ resolved automatically:
 npm install
 npm run build:binary
 bash scripts/build-deb.sh
-sudo apt install ./dist/save-video-cli_1.1.3-1_amd64.deb
+sudo apt install ./dist/save-video-cli_1.1.4-1_amd64.deb
 ```
 
 Use `apt install ./file.deb`, including the `./`. Plain `install save-video-cli`
@@ -272,10 +272,18 @@ save-video-cli "https://youtube.com/watch?v=xyz" --aria2 --connections 4
 # Print startup, transfer, processing, and total timings
 save-video-cli "https://youtube.com/watch?v=xyz" --timing
 
+# Route requests through a local HTTP or SOCKS proxy
+save-video-cli "https://example.com/video" --proxy "socks5://127.0.0.1:1080"
+
 # Save performance defaults
 save-video-cli config set quality 720p
 save-video-cli config set connections 4
 ```
+
+If a site is blocked by the local network, connect a system-wide VPN before
+running the command. Alternatively, pass an HTTP(S) or SOCKS proxy with
+`--proxy`. Avoid putting proxy passwords directly in commands because they may
+be retained in shell history.
 
 A desktop notification fires automatically when a download finishes. Click it
 to open the destination folder on Linux (`notify-send` + `xdg-open`) or macOS

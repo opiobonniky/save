@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   isLikelyPlaylistUrl,
   parseCount,
+  parseProxy,
   resolveQualitySelector,
 } from '../src/options.js';
 
@@ -31,6 +32,18 @@ describe('count validation', () => {
   test('rejects out-of-range and fractional values', () => {
     assert.throws(() => parseCount('17', 'connections'), /1 to 16/);
     assert.throws(() => parseCount('2.5', 'connections'), /integer/);
+  });
+});
+
+describe('proxy validation', () => {
+  test('accepts HTTP and SOCKS proxy URLs', () => {
+    assert.equal(parseProxy('http://127.0.0.1:8080'), 'http://127.0.0.1:8080');
+    assert.equal(parseProxy('socks5h://127.0.0.1:1080'), 'socks5h://127.0.0.1:1080');
+  });
+
+  test('rejects malformed and unsupported proxy URLs', () => {
+    assert.throws(() => parseProxy('127.0.0.1:8080'), /valid HTTP\(S\) or SOCKS URL/);
+    assert.throws(() => parseProxy('ftp://127.0.0.1'), /must use http/);
   });
 });
 

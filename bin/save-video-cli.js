@@ -13,6 +13,7 @@ import { getConfig } from '../src/config.js';
 import {
   isLikelyPlaylistUrl,
   parseCount,
+  parseProxy,
   resolveQualitySelector,
 } from '../src/options.js';
 import { getRuntimeDiagnostics } from '../src/runtime.js';
@@ -43,6 +44,7 @@ program
   .option('--overwrite', 'replace an existing download instead of skipping it')
   .option('--subs [langs]', 'save SRT subtitles; languages are comma-separated (default: en)')
   .option('--aria2', 'opt in to aria2c for large direct files (slower startup)')
+  .option('--proxy <url>', 'route site requests through an HTTP(S) or SOCKS proxy')
   .option('-N, --connections <count>', 'native fragment or aria2 connection count, 1-16 (default: 4)')
   .option('-j, --jobs <count>', 'simultaneous batch downloads, 1-4', '1')
   .option('--timing', 'print preflight, startup, transfer, processing, and total times')
@@ -80,6 +82,7 @@ Examples:
   save-video-cli "https://youtube.com/playlist?list=LIST_ID"
   save-video-cli --batch urls.txt ~/Videos --jobs 2
   save-video-cli "https://example.com/large-video" --aria2 --connections 4
+  save-video-cli "https://example.com/video" --proxy "socks5://127.0.0.1:1080"
   save-video-cli "https://youtu.be/VIDEO_ID" --timing
 
 Useful commands:
@@ -226,6 +229,7 @@ async function run(url, outputDirArg, options) {
   const quality = options.quality || cfg.get('quality') || '1080p';
   const qualitySelector = resolveQualitySelector(quality);
   const connections = parseCount(options.connections || cfg.get('connections') || 4, 'connections');
+  const proxy = parseProxy(options.proxy);
   const downloadOpts = {
     audio: !!options.audio,
     overwrite: !!options.overwrite,
@@ -235,6 +239,7 @@ async function run(url, outputDirArg, options) {
     connections,
     timing: !!options.timing,
     noProgress: !!options.noProgress,
+    proxy,
   };
 
   const needsMetadata =
@@ -252,7 +257,7 @@ async function run(url, outputDirArg, options) {
   }
 
   console.log(chalk.blue('Fetching video info...'));
-  const result = await extractFormats(url);
+  const result = await extractFormats(url, { proxy });
   downloadOpts.preflightSeconds = (Date.now() - operationStartedAt) / 1000;
   console.log(chalk.green(`Found: ${result.title}`));
 
@@ -371,6 +376,7 @@ function getPlaylistOptions(options) {
     subs: !!options.subs,
     subLangs: typeof options.subs === 'string' ? options.subs : cfg.get('subLangs'),
     noProgress: !!options.noProgress,
+    proxy: parseProxy(options.proxy),
   };
 }
 

@@ -24,6 +24,23 @@ export function parseCount(value, name, { min = 1, max = 16 } = {}) {
   return count;
 }
 
+export function parseProxy(value) {
+  if (!value) return undefined;
+  if (!/^[a-z][a-z\d+.-]*:\/\//i.test(value)) {
+    throw new Error('proxy must be a valid HTTP(S) or SOCKS URL.');
+  }
+  let proxy;
+  try {
+    proxy = new URL(value);
+  } catch {
+    throw new Error('proxy must be a valid HTTP(S) or SOCKS URL.');
+  }
+  if (!['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:', 'socks5h:'].includes(proxy.protocol)) {
+    throw new Error('proxy must use http, https, socks4, socks4a, socks5, or socks5h.');
+  }
+  return value;
+}
+
 export function isLikelyPlaylistUrl(value) {
   try {
     const url = new URL(value);

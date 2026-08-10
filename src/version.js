@@ -1,2 +1,2 @@
 // Keep synchronized with package.json; test/version.test.js enforces this.
-export const VERSION = '1.1.3';
+export const VERSION = '1.1.4';

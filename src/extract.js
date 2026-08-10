@@ -40,7 +40,7 @@ export function normalizeFormats(formats) {
  * of formats — the caller decides whether to download the whole playlist
  * or let the user pick specific videos from it.
  */
-export async function extractFormats(url) {
+export async function extractFormats(url, options = {}) {
   let info;
   try {
     info = await youtubedl(url, {
@@ -49,6 +49,7 @@ export async function extractFormats(url) {
       noCheckCertificates: true,
       preferFreeFormats: true,
       flatPlaylist: true,
+      proxy: options.proxy,
       ...getYtDlpRuntimeOptions(),
     });
   } catch (err) {

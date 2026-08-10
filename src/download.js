@@ -93,6 +93,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     retries: 10, // auto-retry transient network failures instead of failing immediately
     fragmentRetries: 10,
     progressDelta: 0.25,
+    proxy: opts.proxy,
     ...getYtDlpRuntimeOptions(),
     ...getFfmpegOptions(),
   };
@@ -187,7 +188,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     clearInterval(preparationTimer);
     bar.stop();
     const hint = /(?:timed? out|timeout)/i.test(stderrBuffer)
-      ? '\n(The site connection timed out. Check that the URL opens in your browser, then retry without a VPN, proxy, or restrictive firewall.)'
+      ? '\n(The site connection timed out. Check your network, use a system-wide VPN, or pass --proxy <url> if the site is blocked.)'
       : /ffmpeg/i.test(stderrBuffer)
       ? '\n(ffmpeg processing failed. Run save-video-cli doctor and reinstall the package if ffmpeg is missing.)'
       : usingAria2c
@@ -263,6 +264,7 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     retries: 10,
     fragmentRetries: 10,
     yesPlaylist: true,
+    proxy: opts.proxy,
     ignoreErrors: true, // one broken video in a playlist shouldn't abort the whole batch
     format: opts.audio ? 'bestaudio' : opts.format || 'bestvideo+bestaudio/best',
     concurrentFragments: opts.connections || 4,
