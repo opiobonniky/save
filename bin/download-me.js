@@ -22,23 +22,27 @@ const program = new Command();
 
 program
   .name('download-me')
-  .description('Download videos from YouTube, TikTok, Facebook, and other platforms')
-  .version('1.0.0')
-  .argument('[url]', 'video or playlist URL')
-  .argument('[outputDir]', 'directory to save the video (defaults to current directory)')
-  .option('-f, --format <formatId>', 'skip picker, use specific format id')
-  .option('-q, --quality <preset>', 'quality preset: 360p, 480p, 720p, 1080p, 1440p, 2160p, best')
-  .option('--choose', 'show the interactive format picker instead of using a quality preset')
-  .option('--audio', 'download audio only, converted to mp3 (requires ffmpeg)')
-  .option('--list-formats', 'just list available formats, do not download')
-  .option('--overwrite', 'force re-download even if the file already exists')
-  .option('--subs [langs]', 'download subtitles (default language: en; comma-separate for more)')
-  .option('--aria2', 'use aria2c acceleration (more connections, but slower startup)')
-  .option('-N, --connections <count>', 'fragment or aria2 connection count (1-16)')
-  .option('-j, --jobs <count>', 'parallel batch downloads (1-4)', '1')
-  .option('--timing', 'print startup, transfer, processing, and total times')
-  .option('--playlist', 'force interactive playlist discovery')
-  .option('--batch <file>', 'download every URL listed in a text file (one per line)')
+  .description('Fast, friendly video and audio downloads powered by yt-dlp')
+  .usage('[options] <url> [outputDir]\n       download-me --batch <file> [outputDir]\n       download-me <command>')
+  .version('1.0.1')
+  .showSuggestionAfterError()
+  .showHelpAfterError()
+  .configureHelp({ sortSubcommands: true })
+  .argument('[url]', 'video, audio, or playlist URL (quote URLs containing & or ?)')
+  .argument('[outputDir]', 'destination directory (current directory or saved default)')
+  .option('-f, --format <id>', 'use an exact yt-dlp format ID; inspect IDs with --list-formats')
+  .option('-q, --quality <preset>', 'quality: 360p, 480p, 720p, 1080p, 1440p, 2160p, or best')
+  .option('--choose', 'open an interactive quality/format picker')
+  .option('--audio', 'save best available audio as MP3 (requires ffmpeg)')
+  .option('--list-formats', 'display downloadable formats and exit')
+  .option('--overwrite', 'replace an existing download instead of skipping it')
+  .option('--subs [langs]', 'save SRT subtitles; languages are comma-separated (default: en)')
+  .option('--aria2', 'opt in to aria2c for large direct files (slower startup)')
+  .option('-N, --connections <count>', 'native fragment or aria2 connection count, 1-16 (default: 4)')
+  .option('-j, --jobs <count>', 'simultaneous batch downloads, 1-4', '1')
+  .option('--timing', 'print preflight, startup, transfer, processing, and total times')
+  .option('--playlist', 'force playlist detection and interactive item selection')
+  .option('--batch <file>', 'read URLs from a text file; blank lines and # comments are ignored')
   .action(async (url, outputDir, options) => {
     try {
       if (options.batch) {
@@ -54,10 +58,49 @@ program
       console.error(chalk.red(`Error: ${err.message}`));
       process.exit(1);
     }
-  });
+  })
+  .addHelpText('after', `
+Defaults:
+  Quality is 1080p and connections is 4. Change saved defaults with:
+    download-me config set quality 720p
+    download-me config set connections 4
+    download-me config set outputDir ~/Videos
+
+Examples:
+  download-me "https://youtu.be/VIDEO_ID"
+  download-me "https://youtu.be/VIDEO_ID" ~/Videos --quality 720p
+  download-me "https://youtu.be/VIDEO_ID" --choose
+  download-me "https://youtu.be/VIDEO_ID" --audio
+  download-me "https://youtu.be/VIDEO_ID" --subs en,fr
+  download-me "https://youtube.com/playlist?list=LIST_ID"
+  download-me --batch urls.txt ~/Videos --jobs 2
+  download-me "https://example.com/large-video" --aria2 --connections 4
+  download-me "https://youtu.be/VIDEO_ID" --timing
+
+Useful commands:
+  download-me doctor          Check yt-dlp, ffmpeg, aria2c, and JS runtime support
+  download-me config get      Show saved defaults
+  download-me config reset    Restore all defaults
+
+Notes:
+  --quality best may download very large 1440p or 4K files.
+  Use --aria2 only when native downloading does not fill your connection.
+  Respect site terms and content rights.`);
 
 // --- config subcommand: download-me config <get|set|reset> ---
-const configCmd = program.command('config').description('view or change saved defaults');
+const configCmd = program
+  .command('config')
+  .description('view or change saved defaults')
+  .addHelpText('after', `
+Examples:
+  download-me config get
+  download-me config set outputDir ~/Videos
+  download-me config set quality 720p
+  download-me config set connections 4
+  download-me config set subLangs en,fr
+  download-me config reset
+
+Known keys: outputDir, quality, connections, subLangs`);
 
 configCmd
   .command('get')
@@ -111,7 +154,15 @@ program
       console.log('Install Deno 2.3+ (recommended) or use Node.js 22+.');
       process.exitCode = 1;
     }
-  });
+  })
+  .addHelpText('after', `
+Checks:
+  yt-dlp       Site extraction and media transfer
+  ffmpeg       Video/audio merging, MP3, and subtitle conversion
+  aria2c       Optional direct-file acceleration
+  Deno/Node    YouTube JavaScript challenge support
+
+Deno 2.3+ is the recommended YouTube JavaScript runtime.`);
 
 async function resolveOutputDir(outputDirArg) {
   if (outputDirArg) return path.resolve(outputDirArg);
