@@ -14,8 +14,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
       - name: Install dependencies
@@ -37,14 +37,14 @@ jobs:
             artifact: linux-x64
           - os: windows-latest
             artifact: windows-x64
-          - os: macos-13
+          - os: macos-15-intel
             artifact: macos-x64
           - os: macos-14
             artifact: macos-arm64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
       - name: Install dependencies
@@ -52,7 +52,7 @@ jobs:
       - name: Build dependency-free archive
         run: npm run build:standalone
       - name: Upload standalone archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: save-video-cli-${{ matrix.artifact }}
           path: |
@@ -68,13 +68,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
       - name: Validate release version
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: release-assets
           merge-multiple: true

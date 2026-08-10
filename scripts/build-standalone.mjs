@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { build as buildWithEsbuild } from 'esbuild';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import { DENO_VERSION, YT_DLP_VERSION } from '../src/toolVersions.js';
@@ -84,7 +85,13 @@ mkdirSync(cacheDir, { recursive: true });
 rmSync(packageDir, { recursive: true, force: true });
 mkdirSync(libexecDir, { recursive: true });
 
-run(platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build:bundle']);
+await buildWithEsbuild({
+  entryPoints: [path.join(root, 'bin', 'save-video-cli.js')],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  outfile: path.join(root, 'dist', 'save-video-cli.cjs'),
+});
 const pkgBin = path.join(root, 'node_modules', '@yao-pkg', 'pkg', 'lib-es5', 'bin.js');
 const builtApp = path.join(root, 'dist', `save-video-cli-${platformName}-${arch}${executableSuffix}`);
 run(process.execPath, [pkgBin, 'dist/save-video-cli.cjs', '--targets', target.pkg, '--output', builtApp]);
