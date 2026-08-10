@@ -1,0 +1,58 @@
+{
+  "name": "download-me",
+  "version": "1.0.0",
+  "description": "CLI tool to download videos from YouTube, TikTok, Facebook, and other platforms via yt-dlp",
+  "type": "module",
+  "bin": {
+    "download-me": "./bin/download-me.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/download-me.js",
+    "test": "node --test",
+    "postinstall": "bash scripts/install-deps.sh || true",
+    "build:binary": "pkg . --targets node18-linux-x64 --output dist/download-me-linux"
+  },
+  "pkg": {
+    "assets": [],
+    "outputPath": "dist"
+  },
+  "keywords": [
+    "video",
+    "download",
+    "cli",
+    "youtube",
+    "tiktok",
+    "facebook",
+    "yt-dlp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR_USERNAME/download-me.git"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/download-me#readme",
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/download-me/issues"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0",
+    "commander": "^12.0.0",
+    "conf": "^15.1.0",
+    "inquirer": "^9.2.0",
+    "youtube-dl-exec": "^3.0.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0"
+  }
+}

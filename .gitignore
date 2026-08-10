@@ -1,0 +1,9 @@
+node_modules/
+dist/
+packaging/**/usr/local/bin/download-me
+*.log
+.DS_Store
+*.mp4
+*.mp3
+*.webm
+*.mkv

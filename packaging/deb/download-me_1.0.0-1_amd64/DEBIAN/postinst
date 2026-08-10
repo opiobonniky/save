@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Runs automatically after dpkg installs the package.
+# ffmpeg is a hard Depends (already guaranteed installed). yt-dlp and
+# aria2c are Recommends, which apt normally installs too — but if this
+# package was installed via plain `dpkg -i` (which ignores Recommends),
+# this makes sure they still get installed.
+set -e
+
+command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+if ! command_exists yt-dlp; then
+  echo "Installing recommended dependency: yt-dlp..."
+  apt-get update -qq && apt-get install -y yt-dlp || \
+    echo "Could not auto-install yt-dlp — install it manually: sudo apt install yt-dlp"
+fi
+
+if ! command_exists aria2c; then
+  echo "Installing recommended dependency: aria2c (speeds up downloads)..."
+  apt-get update -qq && apt-get install -y aria2 || \
+    echo "Could not auto-install aria2c — install it manually: sudo apt install aria2"
+fi
+
+echo "download-me installed. Try: download-me <url>"
+exit 0
