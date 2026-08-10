@@ -3,10 +3,10 @@ Version: 1.0.0-1
 Section: utils
 Priority: optional
 Architecture: amd64
-Depends: ffmpeg
-Recommends: yt-dlp, aria2c
+Depends: ffmpeg, yt-dlp
+Recommends: aria2
 Maintainer: Bonny <bonny@example.com>
 Description: Download videos from YouTube, TikTok, Facebook, and more
  A terminal tool for downloading videos from YouTube, TikTok, Facebook,
  and hundreds of other sites, with an interactive format picker and
- automatic multi-connection acceleration via aria2c when available.
+ optional multi-connection acceleration via aria2c.

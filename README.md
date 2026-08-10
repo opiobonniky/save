@@ -45,165 +45,128 @@ depend on — that layer is verified by actually running the tool against a
 real URL (see Known limitations).
 
 
-`download-me` auto-detects `aria2c` (installed automatically alongside
-`yt-dlp`/`ffmpeg`) and uses it to accelerate downloads via multiple
-simultaneous connections — usually the biggest speed win available, often
-3-5x faster than a single-connection download on a fast link. Where
-`aria2c` isn't available, it falls back to yt-dlp's own concurrent-fragment
-downloading (`--concurrent-fragments 8`), which still parallelizes DASH/HLS
-streams (the format most YouTube videos use).
+`download-me` uses yt-dlp's native concurrent-fragment downloader by default
+(`--concurrent-fragments 8`). It starts faster, reports progress more often,
+and works particularly well for the DASH/HLS streams used by YouTube.
 
-You'll see `(accelerated via aria2c)` after a download completes when it
-was used. No flags or configuration needed — this is automatic.
-
-A couple of things worth knowing:
-- Actual speed is still capped by your connection and by the source
-  platform's own rate limiting — multi-connection downloading helps most
-  when the bottleneck is *connection count*, not raw bandwidth.
-- Some platforms may rate-limit or block multi-connection downloads more
-  aggressively than single-connection ones. If a download fails right after
-  switching to aria2c, that's the likely cause — the error message will
-  mention this.
-
-## Installing via package managers
-
-### npm (publish once, install anywhere with Node.js)
-
-The package is publish-ready: `npm pack --dry-run` shows a clean ~9KB
-package (the large `dist/` binaries are intentionally excluded — they
-don't belong in the npm registry).
+For a large direct file, opt in to aria2c's multi-connection downloader:
 
 ```bash
-npm login
-npm publish
+download-me <url> --aria2
 ```
 
-Once published, anyone can run:
+aria2c can improve throughput when connection count is the bottleneck, but it
+has a slower startup phase and some platforms rate-limit its parallel requests.
+
+## Installation
+
+### npm from GitHub
+
+Until the package is published to the npm registry, install it directly from
+GitHub:
+
+```bash
+npm install -g github:opiobonniky/download-me
+download-me --version
+```
+
+On Debian or Ubuntu, install the external media tools once:
+
+```bash
+sudo apt update
+sudo apt install ffmpeg aria2
+```
+
+The npm installation does not run `sudo` or modify system packages behind the
+scenes. The npm dependency manages its own `yt-dlp` copy. `aria2` is optional,
+but it enables accelerated downloads through its `aria2c` command.
+
+After publishing the package with `npm publish`, the shorter registry command
+will work:
+
 ```bash
 npm install -g download-me
 ```
 
-### apt / dpkg (Debian, Ubuntu, and derivatives)
+### From a local checkout
+
+Running `npm install` only installs development dependencies. Use either the
+installer or npm's global install command to register `download-me` on `PATH`:
 
 ```bash
-npm run build:binary        # produces dist/download-me-linux
-bash scripts/build-deb.sh   # produces dist/download-me_1.0.0-1_amd64.deb
-sudo dpkg -i dist/download-me_1.0.0-1_amd64.deb
-```
-
-`ffmpeg` is declared as a hard dependency in the package, and `yt-dlp`/`aria2c`
-are installed automatically via a postinst hook if missing. To distribute
-this more widely (so people don't need the source), host the `.deb` in your
-own apt repository, or attach it to a GitHub Release for direct download.
-
-### Homebrew
-
-A ready-to-use tap lives in the separate `homebrew-download-me/` folder
-(see its own README for one-time setup — it needs the binary hosted on a
-GitHub Release first, since Homebrew formulas reference a stable download
-URL + checksum rather than bundling the binary directly). Once set up:
-
-```bash
-brew tap YOUR_USERNAME/download-me
-brew install download-me
-```
-
-### Standalone binary / single-file installer
-
-Covered above — no package manager involved at all, works even without
-Node.js on the target machine.
-
-## Requirements
-
-- Node.js 18+
-- `yt-dlp` installed and available on your `PATH`
-- `ffmpeg` installed and available on your `PATH` — **required** for merging
-  video-only formats with audio, and for converting `--audio` downloads to mp3
-- `aria2c` (optional but recommended) — enables multi-connection accelerated
-  downloads; installed automatically alongside the other dependencies
-
-Install on Linux:
-
-```bash
-sudo apt install yt-dlp ffmpeg
-# yt-dlp is often more up to date via pip:
-pip install -U yt-dlp
-```
-
-## Uninstalling
-
-```bash
-bash uninstall.sh
-```
-
-Removes the `download-me` binary only. `yt-dlp`, `ffmpeg`, and `aria2c` are
-left installed since other tools may depend on them — the script tells you
-how to remove them too if you want.
-
-## Known limitations
-
-- **Playlists are not supported yet.** Passing a playlist URL shows a clear
-  error instead of failing confusingly — pass a direct video URL instead.
-- **Video-only formats need ffmpeg.** Many high-resolution formats (1080p+ on
-  YouTube, for example) ship video and audio as separate streams. This tool
-  detects that automatically and merges in the best audio track for you, but
-  that merge step requires `ffmpeg` — without it, the download fails with an
-  explanation pointing at ffmpeg.
-- **Progress percentage isn't shown for a small number of streams** (some
-  live/unknown-size streams use a yt-dlp progress format with no percentage
-  at all). The download still completes correctly — the progress bar shows
-  live speed with a "(size unknown)" note instead of a percentage in that case.
-- **The standalone binary is Linux x86_64 only.** Running the standalone
-  installer on any other OS/architecture is detected and refused with a
-  clear message rather than installing a broken binary. The npm install path
-  (`install.sh`) works on any platform with Node.js.
-
-## Two ways to install
-
-### Option 1 — Standalone binary (no Node.js required on the target machine)
-
-This is what you want for handing the tool to someone whose machine doesn't
-have Node.js installed. The Node runtime is bundled directly inside the
-executable.
-
-```bash
-bash install-standalone.sh
-```
-
-That copies the prebuilt binary in `dist/download-me-linux` to `/usr/local/bin/download-me`
-and auto-installs `yt-dlp`/`ffmpeg`. Nothing else is required on that machine.
-
-If you're building it yourself (only the build machine needs Node.js):
-```bash
-npm install
-npm run build:binary   # produces dist/download-me-linux (~60MB, self-contained)
-```
-
-### Option 2 — Via npm (for machines that already have Node.js)
-
-```bash
+git clone https://github.com/opiobonniky/download-me.git
+cd download-me
 bash install.sh
 ```
 
-This installs `download-me` globally through npm, which also handles `PATH`
-setup and triggers the same automatic `yt-dlp`/`ffmpeg` install.
+The equivalent manual commands are:
 
-Both options end with the exact same result: `download-me` runnable from
-anywhere in the terminal, with `yt-dlp` and `ffmpeg` installed automatically.
-
-**Note on distributing `install-download-me.sh`:** it must be downloaded and
-run as a saved file (`bash install-download-me.sh`), not piped directly
-through curl (`curl ... | bash`) — it reads its own embedded binary from its
-file path, which doesn't exist when streamed through a pipe. If you host it
-somewhere and want a true one-liner, download it to a temp file first:
 ```bash
-curl -sSL <your-url> -o /tmp/install-download-me.sh && bash /tmp/install-download-me.sh
+npm install
+npm install -g .
+npm run setup:linux
 ```
 
-**Safety checks all three install paths now perform:**
-- Detects whether `sudo` is available and skips it automatically if already running as root (rather than crashing when `sudo` isn't installed, e.g. inside containers)
-- Refuses to install on anything other than Linux x86_64, with a clear message, instead of silently installing a broken binary
-- Verifies the extracted/copied binary is a reasonable size and actually runs `--version` successfully before installing it system-wide
+### Debian and Ubuntu
+
+Build and install the local Debian package with apt so its dependencies are
+resolved automatically:
+
+```bash
+npm install
+npm run build:binary
+bash scripts/build-deb.sh
+sudo apt install ./dist/download-me_1.0.0-1_amd64.deb
+```
+
+Use `apt install ./file.deb`, including the `./`. Plain `install download-me`
+is a different Linux file-copy command, while `dpkg -i` does not resolve
+missing dependencies automatically.
+
+For users to run `sudo apt install download-me` by package name, the generated
+`.deb` must first be published in a signed apt repository. A GitHub Release can
+host direct `.deb` downloads, but it is not itself an apt repository.
+
+### Standalone Linux binary
+
+The standalone build includes Node.js and supports Linux x86_64:
+
+```bash
+npm install
+npm run build:binary
+bash install-standalone.sh
+```
+
+## Requirements
+
+- Node.js 18 or newer for npm installations
+- `yt-dlp` available on `PATH` for standalone and Debian installations; npm
+  installations receive a managed copy automatically
+- `ffmpeg` for merging video and audio or producing MP3 files
+- `aria2c` optional for multi-connection acceleration (`aria2` package on apt)
+
+## Uninstalling
+
+Use the command matching the installation method:
+
+```bash
+npm uninstall -g download-me
+sudo apt remove download-me
+bash uninstall.sh  # standalone installer
+```
+
+System media tools are left installed because other applications may use them.
+
+## Known limitations
+
+- **Video-only formats need ffmpeg.** Many high-resolution formats (1080p+ on
+  YouTube, for example) ship video and audio as separate streams. This tool
+  detects that automatically and merges in the best audio track for you.
+- **Progress percentage isn't shown for a small number of streams** (some
+  live/unknown-size streams use a yt-dlp progress format with no percentage
+  at all). The download still completes correctly and displays its live speed.
+- **The standalone binary is Linux x86_64 only.** The npm installation remains
+  available on other platforms supported by Node.js and the external tools.
 
 ## Usage
 
@@ -237,13 +200,16 @@ download-me --batch urls.txt ~/Videos
 
 # Force a fresh download even if the file already exists
 download-me https://youtube.com/watch?v=xyz --overwrite
+
+# Opt in to aria2c for a large direct file (slower startup)
+download-me https://youtube.com/watch?v=xyz --aria2
 ```
 
-A desktop notification fires automatically when a download finishes (Linux
-via `notify-send`, macOS via `osascript`) — paste a link, tab away, and get
-pinged instead of watching the terminal. Silently does nothing on systems
-without a notifier (e.g. headless servers) — it never blocks or affects the
-actual download.
+A desktop notification fires automatically when a download finishes. Click it
+to open the destination folder on Linux (`notify-send` + `xdg-open`) or macOS
+when `terminal-notifier` is installed. macOS falls back to a non-clickable
+`osascript` notification. Headless systems silently skip notifications, and
+the notification listener never blocks the CLI.
 
 ## Project structure
 

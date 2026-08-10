@@ -18,8 +18,9 @@
   "scripts": {
     "start": "node bin/download-me.js",
     "test": "node --test",
-    "postinstall": "bash scripts/install-deps.sh || true",
-    "build:binary": "pkg . --targets node18-linux-x64 --output dist/download-me-linux"
+    "setup:linux": "bash scripts/install-deps.sh",
+    "build:bundle": "esbuild bin/download-me.js --bundle --platform=node --format=cjs --outfile=dist/download-me.cjs",
+    "build:binary": "npm run build:bundle && pkg dist/download-me.cjs --targets node18-linux-x64 --output dist/download-me-linux"
   },
   "pkg": {
     "assets": [],
@@ -38,21 +39,22 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_USERNAME/download-me.git"
+    "url": "git+https://github.com/opiobonniky/download-me.git"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/download-me#readme",
+  "homepage": "https://github.com/opiobonniky/download-me#readme",
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/download-me/issues"
+    "url": "https://github.com/opiobonniky/download-me/issues"
   },
   "dependencies": {
     "chalk": "^4.1.2",
     "cli-progress": "^3.12.0",
     "commander": "^12.0.0",
-    "conf": "^15.1.0",
+    "conf": "^13.1.0",
     "inquirer": "^9.2.0",
     "youtube-dl-exec": "^3.0.0"
   },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.22.0"
+    "@yao-pkg/pkg": "6.12.0",
+    "esbuild": "^0.25.0"
   }
 }

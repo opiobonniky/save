@@ -25,4 +25,4 @@ mkdir -p dist
 cp "${PKG_DIR}.deb" "dist/download-me_${VERSION}_${ARCH}.deb"
 
 echo "Built: dist/download-me_${VERSION}_${ARCH}.deb"
-echo "Install with: sudo dpkg -i dist/download-me_${VERSION}_${ARCH}.deb"
+echo "Install with: sudo apt install ./dist/download-me_${VERSION}_${ARCH}.deb"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ensures yt-dlp and ffmpeg are installed, auto-installing them via
 # whichever package manager is available. Used by:
-#   - npm's postinstall hook (when installed via npm)
+#   - npm run setup:linux (explicit setup after installing via npm)
 #   - install-standalone.sh (when installed via the bundled binary, no Node needed)
 set -u
 
@@ -42,16 +42,17 @@ install_pkg() {
 
 ensure_dep() {
   local name="$1"
+  local package_name="${2:-$1}"
   if command_exists "$name"; then
     echo -e "${GREEN}✓ ${name} already installed${RESET}"
     return 0
   fi
 
   echo -e "${YELLOW}${name} not found — installing automatically...${RESET}"
-  if install_pkg "$name"; then
+  if install_pkg "$package_name"; then
     echo -e "${GREEN}✓ ${name} installed successfully${RESET}"
   else
-    echo -e "${RED}✗ Could not auto-install ${name}. Install it manually, e.g.:\n  sudo apt install ${name}${RESET}"
+    echo -e "${RED}✗ Could not auto-install ${name}. Install it manually, e.g.:\n  sudo apt install ${package_name}${RESET}"
   fi
 }
 
@@ -64,7 +65,7 @@ ensure_dep ffmpeg
 
 echo ""
 echo "Checking optional speed booster..."
-ensure_dep aria2c   # optional: enables multi-connection downloads for much faster speeds
+ensure_dep aria2c aria2   # optional: enables multi-connection downloads for much faster speeds
 
 echo ""
 echo -e "${GREEN}Setup complete.${RESET} You can now run: download-me <url>"

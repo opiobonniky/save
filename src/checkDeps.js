@@ -20,7 +20,7 @@ function commandExists(cmd) {
  */
 export function checkDependencies({ requireFfmpeg = false } = {}) {
   const missing = [];
-  if (!commandExists('yt-dlp')) missing.push('yt-dlp');
+  if (process.pkg && !commandExists('yt-dlp')) missing.push('yt-dlp');
   if (requireFfmpeg && !commandExists('ffmpeg')) missing.push('ffmpeg');
 
   if (missing.length > 0) {

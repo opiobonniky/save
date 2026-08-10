@@ -7,3 +7,7 @@ packaging/**/usr/local/bin/download-me
 *.mp3
 *.webm
 *.mkv
+*.part
+*.part.*
+*.aria2
+test-videos/

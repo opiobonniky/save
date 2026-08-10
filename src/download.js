@@ -1,8 +1,9 @@
-import youtubedl from 'youtube-dl-exec';
+import { youtubedl } from './ytdlp.js';
 import cliProgress from 'cli-progress';
 import path from 'path';
 import { execSync } from 'child_process';
 import { notifyDone } from './notify.js';
+import { parseProgressEvents } from './progress.js';
 
 function commandExists(cmd) {
   try {
@@ -18,10 +19,9 @@ function commandExists(cmd) {
  * into outputDir, with a live progress bar.
  *
  * Speed strategy:
- * 1. If `aria2c` is installed, hand the actual file transfer off to it —
- *    aria2c splits the download across multiple simultaneous connections.
- * 2. Otherwise, fall back to yt-dlp's own native concurrent-fragment
- *    downloading, which still parallelizes DASH/HLS streams.
+ * Native concurrent-fragment downloading is the default because it starts
+ * quickly and exposes better progress data. aria2c remains an explicit opt-in
+ * for large direct files where additional connections are worth the startup.
  *
  * Reliability: retries transient failures automatically (network blips,
  * rate limits) instead of failing on the first hiccup. Partial downloads
@@ -36,17 +36,34 @@ function commandExists(cmd) {
  * @param {boolean} opts.overwrite  - force re-download even if the file already exists
  * @param {boolean} opts.subs       - download subtitles alongside the video
  * @param {string}  opts.subLangs   - subtitle language codes, e.g. "en,es" (default: "en")
+ * @param {boolean} opts.aria2      - opt in to aria2c multi-connection downloading
  */
 export async function downloadVideo(url, formatId, outputDir, opts = {}) {
   const bar = new cliProgress.SingleBar(
     {
-      format: 'Downloading |{bar}| {percentage}% | {speed}',
+      format: 'Downloading |{bar}| {percentage}% | {speed} | {status}',
       hideCursor: true,
+      fps: 20,
+      synchronousUpdate: true,
+      forceRedraw: true,
     },
     cliProgress.Presets.shades_classic
   );
 
-  bar.start(100, 0, { speed: '0 KB/s' });
+  const preparationStartedAt = Date.now();
+  const spinnerFrames = ['-', '\\', '|', '/'];
+  let spinnerIndex = 0;
+  let preparationPhase = 'Starting downloader';
+  let progressStarted = false;
+
+  bar.start(100, 0, { speed: 'waiting', status: `- ${preparationPhase} (0s)` });
+
+  const preparationTimer = setInterval(() => {
+    if (progressStarted) return;
+    const elapsed = Math.floor((Date.now() - preparationStartedAt) / 1000);
+    const spinner = spinnerFrames[spinnerIndex++ % spinnerFrames.length];
+    bar.update(0, { speed: 'waiting', status: `${spinner} ${preparationPhase} (${elapsed}s)` });
+  }, 200);
 
   const outputTemplate = path.join(outputDir, '%(title)s.%(ext)s');
 
@@ -59,9 +76,10 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     mergeOutputFormat: 'mp4',
     retries: 10, // auto-retry transient network failures instead of failing immediately
     fragmentRetries: 10,
+    progressDelta: 0.1,
   };
 
-  const usingAria2c = commandExists('aria2c');
+  const usingAria2c = opts.aria2 && commandExists('aria2c');
 
   if (usingAria2c) {
     ytdlOptions.externalDownloader = 'aria2c';
@@ -92,8 +110,31 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
   let sawAlreadyDownloaded = false;
   let sawResuming = false;
 
+  const updatePhase = (line) => {
+    if (/Downloading \d+ format/i.test(line)) preparationPhase = 'Preparing media';
+    if (/Destination:/i.test(line)) preparationPhase = 'Opening output file';
+    if (/temporary cookies file/i.test(line)) preparationPhase = 'Starting aria2c';
+    if (/\[(?:Merger|ExtractAudio)\]/i.test(line)) {
+      progressStarted = true;
+      bar.update(bar.value, { status: 'Processing final file' });
+    }
+  };
+
+  const updateProgress = (data) => {
+    const events = parseProgressEvents(data.toString());
+    for (const event of events) {
+      progressStarted = true;
+      bar.update(event.percentage, {
+        speed: event.speed || bar.payload.speed || 'calculating...',
+        status: 'Transferring',
+      });
+    }
+    return events.length;
+  };
+
   subprocess.stdout.on('data', (data) => {
     const line = data.toString();
+    updatePhase(line);
 
     if (/has already been downloaded/i.test(line)) {
       sawAlreadyDownloaded = true;
@@ -102,24 +143,25 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
       sawResuming = true;
     }
 
-    const withPercent = line.match(/(\d+(?:\.\d+)?)% .*?at\s+([\d.]+\w+\/s)/);
-    if (withPercent) {
-      bar.update(parseFloat(withPercent[1]), { speed: withPercent[2] });
-      return;
-    }
-    const speedOnly = line.match(/at\s+([\d.]+\w+\/s)/);
+    const progressEvents = updateProgress(data);
+
+    const speedOnly = progressEvents === 0 && line.match(/at\s+([\d.]+\w+\/s)/);
     if (speedOnly) {
       bar.update(bar.value, { speed: `${speedOnly[1]} (size unknown)` });
     }
   });
 
   subprocess.stderr.on('data', (data) => {
-    stderrBuffer += data.toString();
+    const line = data.toString();
+    stderrBuffer += line;
+    updatePhase(line);
+    updateProgress(data);
   });
 
   try {
     await subprocess;
   } catch (err) {
+    clearInterval(preparationTimer);
     bar.stop();
     const hint = /ffmpeg/i.test(stderrBuffer)
       ? '\n(This likely requires ffmpeg to merge/convert the file — install it and try again.)'
@@ -130,7 +172,8 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     throw new Error(`Download failed.\n${detail}${hint}`);
   }
 
-  bar.update(100);
+  clearInterval(preparationTimer);
+  bar.update(100, { status: 'Complete' });
   bar.stop();
 
   if (sawAlreadyDownloaded && !opts.overwrite) {
@@ -145,7 +188,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
   }
 
   console.log(`\nDone. Saved to: ${outputDir}${usingAria2c ? ' (accelerated via aria2c)' : ''}`);
-  notifyDone('Download complete', `Saved to ${outputDir}`);
+  notifyDone('Download complete', `Saved to ${outputDir}`, outputDir);
   return { skipped: false };
 }
 
@@ -158,6 +201,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
  * @param {string} outputDir
  * @param {object} opts
  * @param {boolean} opts.audio - download audio-only (mp3) for every video in the playlist
+ * @param {boolean} opts.aria2 - opt in to aria2c multi-connection downloading
  */
 export async function downloadPlaylist(url, outputDir, opts = {}) {
   const bar = new cliProgress.SingleBar(
@@ -184,7 +228,7 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     format: opts.audio ? 'bestaudio' : 'bestvideo+bestaudio/best',
   };
 
-  if (commandExists('aria2c')) {
+  if (opts.aria2 && commandExists('aria2c')) {
     ytdlOptions.externalDownloader = 'aria2c';
     ytdlOptions.externalDownloaderArgs = 'aria2c:-x16 -s16 -k1M -j16';
   } else {
@@ -233,5 +277,5 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
   if (totalItems > 0) {
     console.log(`(${totalItems} video(s) processed — any that failed were skipped, not fatal.)`);
   }
-  notifyDone('Playlist download complete', `Saved to ${outputDir}`);
+  notifyDone('Playlist download complete', `Saved to ${outputDir}`, outputDir);
 }

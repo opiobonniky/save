@@ -25,6 +25,7 @@ program
   .option('--list-formats', 'just list available formats, do not download')
   .option('--overwrite', 'force re-download even if the file already exists')
   .option('--subs [langs]', 'download subtitles (default language: en; comma-separate for more)')
+  .option('--aria2', 'use aria2c acceleration (more connections, but slower startup)')
   .option('--batch <file>', 'download every URL listed in a text file (one per line)')
   .action(async (url, outputDir, options) => {
     try {
@@ -131,6 +132,7 @@ async function run(url, outputDirArg, options) {
     overwrite: !!options.overwrite,
     subs: !!options.subs,
     subLangs: typeof options.subs === 'string' ? options.subs : getConfig().get('subLangs'),
+    aria2: !!options.aria2,
   };
 
   if (options.audio) {
@@ -178,7 +180,7 @@ async function handlePlaylist(url, result, outputDir, options) {
   if (options.batchMode) {
     console.log(chalk.gray('Batch mode: downloading entire playlist automatically.'));
     console.log(chalk.gray(`Saving to: ${outputDir}`));
-    await downloadPlaylist(url, outputDir, { audio: !!options.audio });
+    await downloadPlaylist(url, outputDir, { audio: !!options.audio, aria2: !!options.aria2 });
     return;
   }
 
@@ -196,7 +198,7 @@ async function handlePlaylist(url, result, outputDir, options) {
 
   if (choice === 'all') {
     console.log(chalk.gray(`Saving to: ${outputDir}`));
-    await downloadPlaylist(url, outputDir, { audio: !!options.audio });
+    await downloadPlaylist(url, outputDir, { audio: !!options.audio, aria2: !!options.aria2 });
     return;
   }
 

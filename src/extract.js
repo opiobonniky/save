@@ -1,4 +1,4 @@
-import youtubedl from 'youtube-dl-exec';
+import { youtubedl } from './ytdlp.js';
 
 /**
  * Fetches video metadata and available formats for a given URL

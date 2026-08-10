@@ -2,7 +2,7 @@
 # One-shot installer for download-me.
 # Run this once: bash install.sh
 # It handles everything — global install, PATH setup (via npm), and
-# automatic installation of yt-dlp/ffmpeg (via the postinstall hook).
+# automatic installation of yt-dlp/ffmpeg.
 # The user never has to configure anything manually.
 
 set -e
@@ -17,9 +17,11 @@ fi
 
 # Installing globally from the local folder:
 # - registers the 'download-me' command on PATH automatically (npm's "bin" field)
-# - triggers scripts/postinstall.js automatically, which installs
-#   yt-dlp and ffmpeg if they're not already present
 npm install -g .
+
+# Keep system package installation explicit rather than hiding sudo/apt calls
+# inside npm's postinstall lifecycle.
+bash "$(dirname "$0")/scripts/install-deps.sh"
 
 echo ""
 echo "Installed. Try it from anywhere:"
