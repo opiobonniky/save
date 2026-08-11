@@ -19,6 +19,7 @@ mkdir -p "$PKG_DIR/DEBIAN" "$PKG_DIR/usr/local/bin"
 cp "$BINARY" "$PKG_DIR/usr/local/bin/save-video-cli"
 chmod 755 "$PKG_DIR/usr/local/bin/save-video-cli"
 ln -s save-video-cli "$PKG_DIR/usr/local/bin/save-video"
+ln -s save-video-cli "$PKG_DIR/usr/local/bin/save"
 ln -s save-video-cli "$PKG_DIR/usr/local/bin/download-me"
 cp -r packaging/deb/download-me_1.0.0-1_amd64/DEBIAN/* "$PKG_DIR/DEBIAN/"
 

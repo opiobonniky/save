@@ -37,7 +37,7 @@ export function youtubedl(url, options) {
   return new Promise((resolve, reject) => {
     const executable = getYtDlpExecutablePath();
     if (!executable) {
-      reject(new Error('yt-dlp is unavailable. Run save-video-cli doctor for details.'));
+      reject(new Error('yt-dlp is unavailable. Run save doctor for details.'));
       return;
     }
     execFile(
@@ -62,7 +62,7 @@ export function youtubedl(url, options) {
 
 export function spawnYtDlp(url, options) {
   const executable = getYtDlpExecutablePath();
-  if (!executable) throw new Error('yt-dlp is unavailable. Run save-video-cli doctor for details.');
+  if (!executable) throw new Error('yt-dlp is unavailable. Run save doctor for details.');
   const subprocess = spawn(executable, [url, ...ytDlpArgs(options)], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });

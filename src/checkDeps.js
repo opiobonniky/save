@@ -17,8 +17,8 @@ export function checkDependencies({ requireFfmpeg = false } = {}) {
 
   if (missing.length > 0) {
     const recovery = process.pkg
-      ? 'The application bundle is incomplete. Extract the full archive again and keep libexec beside save-video-cli.'
-      : 'Reinstall save-video-cli so npm can restore its managed tools.';
+      ? 'The application bundle is incomplete. Extract the full archive again and keep libexec beside the main executable.'
+      : 'Reinstall @opiobonniky/vidfetch so npm can restore its managed tools.';
     console.error(
       chalk.red(
         `\nMissing required tool(s): ${missing.join(', ')}\n` +

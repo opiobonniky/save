@@ -190,7 +190,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     const hint = /(?:timed? out|timeout)/i.test(stderrBuffer)
       ? '\n(The site connection timed out. Check your network, use a system-wide VPN, or pass --proxy <url> if the site is blocked.)'
       : /ffmpeg/i.test(stderrBuffer)
-      ? '\n(ffmpeg processing failed. Run save-video-cli doctor and reinstall the package if ffmpeg is missing.)'
+      ? '\n(ffmpeg processing failed. Run save doctor and reinstall the package if ffmpeg is missing.)'
       : usingAria2c
         ? '\n(aria2c was used for this download — try again without it if this persists.)'
         : '';

@@ -1,4 +1,4 @@
-# save-video-cli
+# vidfetch
 
 A terminal tool for downloading videos from YouTube, TikTok, Facebook, and hundreds of
 other sites, with an interactive format picker.
@@ -50,7 +50,7 @@ depend on — that layer is verified by actually running the tool against a
 real URL (see Known limitations).
 
 
-`save-video-cli` uses yt-dlp's native concurrent-fragment downloader by default
+`save` uses yt-dlp's native concurrent-fragment downloader by default
 (`--concurrent-fragments 4`, configurable with `--connections`). It starts faster, reports progress more often,
 and works particularly well for the DASH/HLS streams used by YouTube.
 
@@ -88,19 +88,19 @@ On Linux or macOS, extract and run it in place:
 ```bash
 unzip save-video-cli-<version>-<platform>-<arch>.zip
 cd save-video-cli-<version>-<platform>-<arch>
-./save-video-cli doctor
-./save-video-cli <url>
+./save doctor
+./save <url>
 ```
 
 The extracted archive also includes an optional `install.sh`, which copies the
-whole self-contained application under `/usr/local` and adds the `save-video-cli`
+whole self-contained application under `/usr/local` and adds the `save`
 command to `PATH`.
 
 On Windows, extract the ZIP and run these commands in PowerShell:
 
 ```powershell
-.\save-video-cli.exe doctor
-.\save-video-cli.exe <url>
+.\save.cmd doctor
+.\save.cmd <url>
 ```
 
 Windows SmartScreen and macOS Gatekeeper may warn because release files are not
@@ -127,7 +127,7 @@ Deno too. `aria2` remains optional.
 ### From a local checkout
 
 Running `npm install` only installs development dependencies. Use either the
-installer or npm's global install command to register `save-video-cli` on `PATH`:
+installer or npm's global install command to register `save` on `PATH`:
 
 ```bash
 git clone https://github.com/opiobonniky/download-me.git
@@ -142,7 +142,7 @@ npm install
 npm install -g .
 ```
 
-If npm reports `EEXIST` for the `save-video-cli` or legacy `download-me` executable, an older global
+If npm reports `EEXIST` for `save` or a compatibility alias, an older global
 package name still owns that command. Remove the legacy package before
 installing the current one:
 

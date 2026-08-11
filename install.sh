@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot installer for save-video-cli.
+# One-shot installer for vidfetch.
 # Run this once: bash install.sh
 # It handles the global install and PATH setup via npm. The package includes
 # managed yt-dlp and ffmpeg binaries, so no system packages are required.
@@ -7,7 +7,7 @@
 
 set -e
 
-echo "Installing save-video-cli..."
+echo "Installing vidfetch..."
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is required but wasn't found."
@@ -47,7 +47,7 @@ for COMMAND_NAME in save save-video-cli save-video download-me; do
 done
 
 if [ "$REMOVE_OLD" = true ]; then
-  echo "Removing an older save-video-cli package link..."
+  echo "Removing an older vidfetch package link..."
   npm uninstall -g download-me video-download-cli save-video-cli \
     @opiobonniky/download-me @opiobonniky/vidfetch >/dev/null 2>&1 || true
 fi

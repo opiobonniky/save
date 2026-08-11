@@ -22,7 +22,7 @@ as_root() {
 }
 
 if [ ! -e "$TARGET_LINK" ] && [ ! -d "$TARGET_DIR" ]; then
-  echo "save-video-cli is not installed under /usr/local."
+  echo "vidfetch is not installed under /usr/local."
   exit 0
 fi
 
@@ -31,4 +31,4 @@ as_root rm -f "$SAVE_LINK"
 as_root rm -f "$SHORT_LINK"
 as_root rm -f "$LEGACY_LINK"
 as_root rm -rf "$TARGET_DIR"
-echo "Removed save-video-cli and its bundled tools."
+echo "Removed vidfetch and its bundled tools."

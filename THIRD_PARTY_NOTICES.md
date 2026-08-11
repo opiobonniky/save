@@ -16,4 +16,4 @@ The dependency-free release archives redistribute these tools:
 
 The archive's `licenses/` directory contains the license notices supplied by
 these projects. These notices apply only to their respective components; the
-save-video-cli application source remains under the top-level MIT license.
+Vidfetch application source remains under the top-level MIT license.
