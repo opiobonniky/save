@@ -12,9 +12,9 @@ import { checkDependencies } from '../src/checkDeps.js';
 import { getConfig } from '../src/config.js';
 import {
   isLikelyPlaylistUrl,
-  normalizeMediaUrl,
   parseCount,
   parseProxy,
+  resolveMediaUrl,
   resolveQualitySelector,
 } from '../src/options.js';
 import { getRuntimeDiagnostics } from '../src/runtime.js';
@@ -39,7 +39,7 @@ program
   .argument('[outputDir]', 'destination directory (current directory or saved default)')
   .option('-f, --format <id>', 'use an exact yt-dlp format ID; inspect IDs with --list-formats')
   .option('-q, --quality <preset>', 'quality: 360p, 480p, 720p, 1080p, 1440p, 2160p, or best')
-  .option('--choose', 'open an interactive quality/format picker')
+  .option('--choose', 'open the interactive format picker (the default without a selection flag)')
   .option('--audio', 'save best available audio as MP3 (requires ffmpeg)')
   .option('--list-formats', 'display downloadable formats and exit')
   .option('--overwrite', 'replace an existing download instead of skipping it')
@@ -69,7 +69,9 @@ program
   })
   .addHelpText('after', `
 Defaults:
-  Quality is 1080p and connections is 4. Change saved defaults with:
+  Single videos prompt for a format and connections is 4. Skip the picker with:
+    save <url> --quality 1080p
+  Change saved defaults with:
     save config set quality 720p
     save config set connections 4
     save config set outputDir ~/Videos
@@ -219,7 +221,7 @@ function ensureOutputDir(outputDir) {
 }
 
 async function run(url, outputDirArg, options) {
-  url = normalizeMediaUrl(url);
+  url = await resolveMediaUrl(url);
   const operationStartedAt = Date.now();
   if (!getYtDlpExecutablePath()) await ensureManagedYtDlp();
   if (!getFfmpegExecutablePath()) await ensureManagedFfmpeg();
@@ -229,8 +231,8 @@ async function run(url, outputDirArg, options) {
   ensureOutputDir(outputDir);
 
   const cfg = getConfig();
-  const quality = options.quality || cfg.get('quality') || '1080p';
-  const qualitySelector = resolveQualitySelector(quality);
+  const quality = options.quality || cfg.get('quality') || (options.batchMode ? '1080p' : null);
+  const qualitySelector = quality ? resolveQualitySelector(quality) : null;
   const connections = parseCount(options.connections || cfg.get('connections') || 4, 'connections');
   const proxy = parseProxy(options.proxy);
   const downloadOpts = {
@@ -247,7 +249,12 @@ async function run(url, outputDirArg, options) {
 
   const likelyPlaylist = isLikelyPlaylistUrl(url);
   const needsMetadata =
-    options.choose || options.listFormats || options.format || options.playlist || likelyPlaylist;
+    options.choose ||
+    options.listFormats ||
+    options.format ||
+    options.playlist ||
+    likelyPlaylist ||
+    (!options.audio && !quality);
 
   if (!needsMetadata) {
     checkDependencies({ requireFfmpeg: true });
@@ -291,14 +298,11 @@ async function run(url, outputDirArg, options) {
 
   let formatId = options.format;
   if (!formatId) {
-    if (options.choose) {
+    if (options.choose || !quality) {
       formatId = await pickFormat(formats);
     } else {
-      // Zero-decision default: best available quality, no prompt at all.
-      // This is what makes "paste a link, hit enter" actually work end to
-      // end without a menu of format IDs blocking the common case.
       formatId = qualitySelector;
-      console.log(chalk.gray(`Using ${quality} quality (pass --choose to pick a format instead).`));
+      console.log(chalk.gray(`Using ${quality} quality.`));
     }
   }
 

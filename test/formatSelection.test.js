@@ -2,22 +2,18 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveQualitySelector } from '../src/options.js';
 
-// Mirrors the exact format-selection decision logic in bin/save-video-cli.js's
-// run(). Kept as a standalone pure function so the "zero-decision by default"
-// behavior is locked in by a test, not just manual verification — this is
-// the core promise of the --choose feature: pickFormat must NEVER be invoked
-// unless the user explicitly asked for it.
+// Mirrors the format-selection decision in bin/save.js's run().
 function decideFormatId(options) {
   if (options.format) return { formatId: options.format, usedPicker: false };
-  if (options.choose) return { formatId: null, usedPicker: true }; // caller would show the picker
+  if (options.choose || !options.quality) return { formatId: null, usedPicker: true };
   return { formatId: resolveQualitySelector(options.quality), usedPicker: false };
 }
 
 describe('format selection defaults', () => {
-  test('with no flags at all, defaults to balanced 1080p with no picker', () => {
+  test('with no selection flags, opens the format picker', () => {
     const { formatId, usedPicker } = decideFormatId({});
-    assert.equal(formatId, 'bestvideo[height<=1080]+bestaudio/best[height<=1080]');
-    assert.equal(usedPicker, false);
+    assert.equal(formatId, null);
+    assert.equal(usedPicker, true);
   });
 
   test('--quality best restores unlimited quality', () => {
@@ -31,7 +27,7 @@ describe('format selection defaults', () => {
     assert.equal(usedPicker, false);
   });
 
-  test('--choose triggers the picker only when explicitly passed', () => {
+  test('--choose explicitly triggers the picker', () => {
     const { usedPicker } = decideFormatId({ choose: true });
     assert.equal(usedPicker, true);
   });

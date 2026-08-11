@@ -54,7 +54,8 @@ export function isLikelyPlaylistUrl(value) {
 export function normalizeMediaUrl(value) {
   try {
     const url = new URL(value);
-    if (/(^|\.)tiktok\.com$/i.test(url.hostname) && /\/@[^/]+\/video\/\d+\/?$/i.test(url.pathname)) {
+    if (/(^|\.)tiktok\.com$/i.test(url.hostname) && /\/@[^/]+\/(?:video|photo)\/\d+\/?$/i.test(url.pathname)) {
+      url.pathname = url.pathname.replace('/photo/', '/video/');
       url.search = '';
       url.hash = '';
       return url.toString();
@@ -63,4 +64,17 @@ export function normalizeMediaUrl(value) {
     // Leave invalid input untouched so yt-dlp can report the original error.
   }
   return value;
+}
+
+export async function resolveMediaUrl(value, fetchImpl = globalThis.fetch) {
+  try {
+    const url = new URL(value);
+    if (/^(?:vm|vt)\.tiktok\.com$/i.test(url.hostname)) {
+      const response = await fetchImpl(value, { redirect: 'follow' });
+      return normalizeMediaUrl(response.url || value);
+    }
+  } catch {
+    // Preserve the original URL so yt-dlp can provide the final diagnostic.
+  }
+  return normalizeMediaUrl(value);
 }

@@ -15,12 +15,12 @@ const assets = {
 let pendingPreparation = null;
 
 function getCacheDirectory() {
-  if (process.env.DOWNLOAD_ME_CACHE_DIR) return process.env.DOWNLOAD_ME_CACHE_DIR;
+  if (process.env.SAVE_CACHE_DIR) return process.env.SAVE_CACHE_DIR;
   if (process.platform === 'win32') {
-    return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'download-me');
+    return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'save');
   }
-  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Caches', 'download-me');
-  return path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'download-me');
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Caches', 'save');
+  return path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'save');
 }
 
 export function getManagedYtDlpPath() {

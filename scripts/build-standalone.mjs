@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 import { createHash } from 'crypto';
-import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { build as buildWithEsbuild } from 'esbuild';
@@ -42,11 +42,11 @@ if (!target) throw new Error(`Unsupported standalone target: ${platform}-${arch}
 
 const platformName = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'macos' : platform;
 const executableSuffix = platform === 'win32' ? '.exe' : '';
-const artifactName = `save-video-cli-${packageJson.version}-${platformName}-${arch}`;
+const artifactName = `save-${packageJson.version}-${platformName}-${arch}`;
 const packageDir = path.join(root, 'dist', artifactName);
 const libexecDir = path.join(packageDir, 'libexec');
 const cacheDir = path.join(root, 'dist', '.standalone-cache');
-const appPath = path.join(packageDir, `save-video-cli${executableSuffix}`);
+const appPath = path.join(packageDir, `save${executableSuffix}`);
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', ...options });
@@ -89,24 +89,18 @@ rmSync(packageDir, { recursive: true, force: true });
 mkdirSync(libexecDir, { recursive: true });
 
 await buildWithEsbuild({
-  entryPoints: [path.join(root, 'bin', 'save-video-cli.js')],
+  entryPoints: [path.join(root, 'bin', 'save.js')],
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  outfile: path.join(root, 'dist', 'save-video-cli.cjs'),
+  outfile: path.join(root, 'dist', 'save.cjs'),
 });
 const pkgBin = path.join(root, 'node_modules', '@yao-pkg', 'pkg', 'lib-es5', 'bin.js');
-const builtApp = path.join(root, 'dist', `save-video-cli-${platformName}-${arch}${executableSuffix}`);
-run(process.execPath, [pkgBin, 'dist/save-video-cli.cjs', '--targets', target.pkg, '--output', builtApp]);
+const builtApp = path.join(root, 'dist', `save-${platformName}-${arch}${executableSuffix}`);
+run(process.execPath, [pkgBin, 'dist/save.cjs', '--targets', target.pkg, '--output', builtApp]);
 copyExecutable(builtApp, appPath);
 if (platform === 'win32') {
-  writeFileSync(path.join(packageDir, 'save.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
-  writeFileSync(path.join(packageDir, 'save-video.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
-  writeFileSync(path.join(packageDir, 'download-me.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
-} else {
-  symlinkSync('save-video-cli', path.join(packageDir, 'save'));
-  symlinkSync('save-video-cli', path.join(packageDir, 'save-video'));
-  symlinkSync('save-video-cli', path.join(packageDir, 'download-me'));
+  writeFileSync(path.join(packageDir, 'save.cmd'), '@echo off\r\n"%~dp0save.exe" %*\r\n');
 }
 
 const ytDlpDestination = path.join(libexecDir, `yt-dlp${executableSuffix}`);

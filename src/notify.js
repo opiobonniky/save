@@ -40,7 +40,7 @@ export function notifyDone(title, body, openPath) {
         const actionScript =
           'action=$(notify-send --app-name=save --action="default=Open folder" "$1" "$2"); ' +
           '[ "$action" = default ] && xdg-open "$3" >/dev/null 2>&1';
-        runDetached('sh', ['-c', actionScript, 'save-video-cli-notify', title, body, openPath]);
+        runDetached('sh', ['-c', actionScript, 'save-notify', title, body, openPath]);
       } else {
         runDetached('notify-send', ['--app-name=save', title, body]);
       }

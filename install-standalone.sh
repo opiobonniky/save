@@ -3,11 +3,8 @@
 set -e
 
 SOURCE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-TARGET_DIR="/usr/local/lib/save-video-cli"
-TARGET_LINK="/usr/local/bin/save-video-cli"
-SAVE_LINK="/usr/local/bin/save"
-SHORT_LINK="/usr/local/bin/save-video"
-LEGACY_LINK="/usr/local/bin/download-me"
+TARGET_DIR="/usr/local/lib/save"
+TARGET_LINK="/usr/local/bin/save"
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
@@ -31,7 +28,7 @@ case "$(uname -s)" in
     ;;
 esac
 
-for executable in save-video-cli libexec/yt-dlp libexec/ffmpeg libexec/ffprobe libexec/deno; do
+for executable in save libexec/yt-dlp libexec/ffmpeg libexec/ffprobe libexec/deno; do
   if [ ! -x "$SOURCE_DIR/$executable" ]; then
     echo "Missing bundled executable: $executable"
     echo "Run this installer from inside an extracted dependency-free archive."
@@ -39,16 +36,13 @@ for executable in save-video-cli libexec/yt-dlp libexec/ffmpeg libexec/ffprobe l
   fi
 done
 
-echo "Installing the self-contained vidfetch application..."
+echo "Installing the self-contained save application..."
 as_root mkdir -p "$TARGET_DIR" /usr/local/bin
 if [ "$SOURCE_DIR" != "$TARGET_DIR" ]; then
   as_root cp -R "$SOURCE_DIR/." "$TARGET_DIR/"
 fi
-as_root chmod +x "$TARGET_DIR/save-video-cli" "$TARGET_DIR/libexec/"*
-as_root ln -sf "$TARGET_DIR/save-video-cli" "$TARGET_LINK"
-as_root ln -sf "$TARGET_DIR/save-video-cli" "$SAVE_LINK"
-as_root ln -sf "$TARGET_DIR/save-video-cli" "$SHORT_LINK"
-as_root ln -sf "$TARGET_DIR/save-video-cli" "$LEGACY_LINK"
+as_root chmod +x "$TARGET_DIR/save" "$TARGET_DIR/libexec/"*
+as_root ln -sf "$TARGET_DIR/save" "$TARGET_LINK"
 
 echo "Installed to $TARGET_DIR"
 echo "Run: save <url>"

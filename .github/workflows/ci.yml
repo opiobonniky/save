@@ -22,7 +22,7 @@ jobs:
         run: npm ci
       - name: Syntax check
         run: |
-          for f in bin/save-video-cli.js src/*.js; do node --check "$f"; done
+          for f in bin/save.js src/*.js; do node --check "$f"; done
       - name: Run tests
         run: npm test
 
@@ -54,7 +54,7 @@ jobs:
       - name: Upload standalone archive
         uses: actions/upload-artifact@v5
         with:
-          name: save-video-cli-${{ matrix.artifact }}
+          name: save-${{ matrix.artifact }}
           path: dist/*.zip
           if-no-files-found: error
 

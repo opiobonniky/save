@@ -3,9 +3,9 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 
 const TOOL_ENV = {
-  deno: 'DOWNLOAD_ME_DENO',
-  ffmpeg: 'DOWNLOAD_ME_FFMPEG',
-  'yt-dlp': 'DOWNLOAD_ME_YTDLP',
+  deno: 'SAVE_DENO',
+  ffmpeg: 'SAVE_FFMPEG',
+  'yt-dlp': 'SAVE_YTDLP',
 };
 
 export function isExecutable(filePath, platform = process.platform) {

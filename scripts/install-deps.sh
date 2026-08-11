@@ -57,7 +57,7 @@ ensure_dep() {
 }
 
 echo ""
-echo "Setting up vidfetch dependencies..."
+echo "Setting up save dependencies..."
 echo ""
 
 ensure_dep yt-dlp

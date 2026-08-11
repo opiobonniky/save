@@ -6,6 +6,7 @@ import {
   parseCount,
   parseProxy,
   resolveQualitySelector,
+  resolveMediaUrl,
 } from '../src/options.js';
 
 describe('quality presets', () => {
@@ -63,6 +64,23 @@ describe('media URL normalization', () => {
   test('removes unstable tracking parameters from TikTok video URLs', () => {
     assert.equal(
       normalizeMediaUrl('https://www.tiktok.com/@user/video/123?is_from_webapp=1&sender_device=pc'),
+      'https://www.tiktok.com/@user/video/123'
+    );
+  });
+
+  test('rewrites TikTok photo posts to the extractor-supported video route', () => {
+    assert.equal(
+      normalizeMediaUrl('https://www.tiktok.com/@user/photo/123?_r=1&_t=tracking'),
+      'https://www.tiktok.com/@user/video/123'
+    );
+  });
+
+  test('resolves TikTok short links before normalizing them', async () => {
+    const fetchImpl = async () => ({
+      url: 'https://www.tiktok.com/@user/photo/123?_r=1&_t=tracking',
+    });
+    assert.equal(
+      await resolveMediaUrl('https://vt.tiktok.com/example/', fetchImpl),
       'https://www.tiktok.com/@user/video/123'
     );
   });

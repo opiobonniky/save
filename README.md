@@ -1,4 +1,4 @@
-# vidfetch
+# save
 
 A terminal tool for downloading videos from YouTube, TikTok, Facebook, and hundreds of
 other sites, with an interactive format picker.
@@ -12,10 +12,10 @@ which does the actual site-specific extraction work.
   or pick specific videos from an interactive checklist.
 - **Batch mode.** `save --batch urls.txt` downloads every URL in a
   text file (one per line, `#` for comments), with bounded `--jobs` concurrency.
-- **Fast direct-video path.** Normal downloads skip the duplicate metadata
-  request; full extraction only runs for format picking and playlists.
-- **Quality presets.** Balanced 1080p is the default, with 360p through 2160p
-  and unlimited `best` available through `--quality`.
+- **Interactive by default.** Single-video links open the format picker unless
+  `--quality`, `--format`, or `--audio` selects a non-interactive mode.
+- **Quality presets.** Skip the picker with a preset from 360p through 2160p,
+  or use unlimited `best` through `--quality`.
 - **Friendly format picker.** Formats are labeled as 360p, 720p, 1080p, etc.;
   YouTube storyboard thumbnails are excluded from downloadable choices.
 - **Saved defaults.** `save config set outputDir ~/Videos` remembers
@@ -69,14 +69,14 @@ The CLI uses the same moderate connection count for aria2 rather than forcing 16
 ### Dependency-free application
 
 Download the archive for your computer from the
-[latest release](https://github.com/opiobonniky/download-me/releases/latest):
+[latest release](https://github.com/opiobonniky/save/releases/latest):
 
 | System | Archive |
 | --- | --- |
-| Linux x64 | `save-video-cli-<version>-linux-x64.zip` |
-| Windows x64 | `save-video-cli-<version>-windows-x64.zip` |
-| macOS Intel | `save-video-cli-<version>-macos-x64.zip` |
-| macOS Apple silicon | `save-video-cli-<version>-macos-arm64.zip` |
+| Linux x64 | `save-<version>-linux-x64.zip` |
+| Windows x64 | `save-<version>-windows-x64.zip` |
+| macOS Intel | `save-<version>-macos-x64.zip` |
+| macOS Apple silicon | `save-<version>-macos-arm64.zip` |
 
 The archive contains the app runtime, standalone yt-dlp, ffmpeg, ffprobe, and
 Deno. It does not need Node.js, Python, npm, yt-dlp, ffmpeg, Deno, sudo, or a
@@ -86,8 +86,8 @@ executable; the application resolves its private tools from there.
 On Linux or macOS, extract and run it in place:
 
 ```bash
-unzip save-video-cli-<version>-<platform>-<arch>.zip
-cd save-video-cli-<version>-<platform>-<arch>
+unzip save-<version>-<platform>-<arch>.zip
+cd save-<version>-<platform>-<arch>
 ./save doctor
 ./save <url>
 ```
@@ -110,12 +110,11 @@ during the build, and macOS executables receive an ad-hoc signature.
 ### npm alternative
 
 ```bash
-npm install -g @opiobonniky/vidfetch
+npm install -g @opiobonniky/save
 save --version
 ```
 
-`save` is the primary command. The previous `save-video-cli`, `save-video`, and
-`download-me` commands remain available for existing scripts.
+The npm package installs only the `save` command.
 
 The npm installation does not run `sudo` or modify system packages behind the
 scenes. On first use, the CLI downloads standalone yt-dlp and ffmpeg binaries,
@@ -130,8 +129,8 @@ Running `npm install` only installs development dependencies. Use either the
 installer or npm's global install command to register `save` on `PATH`:
 
 ```bash
-git clone https://github.com/opiobonniky/download-me.git
-cd download-me
+git clone https://github.com/opiobonniky/save.git
+cd save
 bash install.sh
 ```
 
@@ -142,16 +141,9 @@ npm install
 npm install -g .
 ```
 
-If npm reports `EEXIST` for `save` or a compatibility alias, an older global
-package name still owns that command. Remove the legacy package before
-installing the current one:
-
-```bash
-npm uninstall -g download-me video-download-cli @opiobonniky/vidfetch
-npm install -g @opiobonniky/vidfetch
-```
-
-Do not use `npm install --force`; it can overwrite an unrelated executable.
+If npm reports `EEXIST` for `save`, remove the package that currently owns that
+command before installing. Do not use `npm install --force`; it can overwrite
+an unrelated executable.
 
 ### Debian and Ubuntu
 
@@ -162,14 +154,14 @@ resolved automatically:
 npm install
 npm run build:binary
 bash scripts/build-deb.sh
-sudo apt install ./dist/save-video-cli_1.1.6-1_amd64.deb
+sudo apt install ./dist/save_1.1.7-1_amd64.deb
 ```
 
-Use `apt install ./file.deb`, including the `./`. Plain `install save-video-cli`
-is a different Linux file-copy command, while `dpkg -i` does not resolve
-missing dependencies automatically.
+Use `apt install ./file.deb`, including the `./`. Plain `install save` is a
+different Linux file-copy command, while `dpkg -i` does not resolve missing
+dependencies automatically.
 
-For users to run `sudo apt install save-video-cli` by package name, the generated
+For users to run `sudo apt install save` by package name, the generated
 `.deb` must first be published in a signed apt repository. A GitHub Release can
 host direct `.deb` downloads, but it is not itself an apt repository.
 
@@ -205,8 +197,8 @@ save doctor
 Use the command matching the installation method:
 
 ```bash
-npm uninstall -g @opiobonniky/vidfetch
-sudo apt remove save-video-cli
+npm uninstall -g @opiobonniky/save
+sudo apt remove save
 bash uninstall.sh  # standalone installer
 ```
 
@@ -214,6 +206,9 @@ System media tools are left installed because other applications may use them.
 
 ## Known limitations
 
+- **TikTok photo carousels are not video streams.** TikTok short links and
+  `/photo/` routes are normalized so yt-dlp can inspect them, but yt-dlp may
+  expose only the post's audio track rather than the carousel images.
 - **Video-only formats use ffmpeg.** Many high-resolution formats (1080p+ on
   YouTube, for example) ship video and audio as separate streams. This tool
   detects that automatically and merges in the best audio track for you. npm
@@ -234,14 +229,14 @@ An unquoted `&` makes Bash run the downloader in the background, producing a
 `[1] <pid>` message and treating anything after it as a separate command.
 
 ```bash
-# Zero-decision default: balanced 1080p, one extraction, no menu
+# Open the interactive format picker
 save "https://youtube.com/watch?v=xyz"
 
 # Select a quality preset, including unlimited best quality
 save "https://youtube.com/watch?v=xyz" --quality 720p
 save "https://youtube.com/watch?v=xyz" --quality best
 
-# Want control over the exact format instead? Opt in explicitly:
+# Explicitly request the picker (equivalent to the default):
 save "https://youtube.com/watch?v=xyz" --choose
 
 # Save to a specific directory (trailing argument)
@@ -296,9 +291,9 @@ the notification listener never blocks the CLI.
 ## Project structure
 
 ```
-save-video-cli/
+save/
 ├── bin/
-│   └── save-video-cli.js   # CLI entry point (argument parsing, orchestration)
+│   └── save.js             # CLI entry point (argument parsing, orchestration)
 ├── src/
 │   ├── extract.js           # fetches available formats for a URL via yt-dlp
 │   ├── prompt.js              # interactive format picker (inquirer)
@@ -308,7 +303,7 @@ save-video-cli/
 ├── scripts/
 │   └── install-deps.sh       # auto-installs yt-dlp/ffmpeg (used by both install paths)
 ├── dist/
-│   └── save-video-cli-linux   # prebuilt standalone binary (after npm run build:binary)
+│   └── save-linux          # prebuilt standalone binary (after npm run build:binary)
 ├── install.sh                  # installs via npm (machine already has Node.js)
 ├── install-standalone.sh         # installs the bundled binary (no Node.js needed)
 ├── package.json
@@ -317,10 +312,9 @@ save-video-cli/
 
 ## How it works
 
-1. Ordinary video and audio downloads go directly to yt-dlp, avoiding a duplicate
-   metadata extraction before transfer starts.
-2. `--choose`, `--list-formats`, and playlist URLs use `extract.js`; playlists
-   use flat metadata and selected playlist indices rather than extracting every entry.
+1. Ordinary single-video downloads use `extract.js` to populate the format picker.
+2. Explicit `--quality`, `--format`, and `--audio` selections avoid prompting;
+   playlists use flat metadata and selected playlist indices.
 3. `prompt.js` shows the format or playlist picker only when interaction is needed.
 4. `download.js` runs the download, parsing its progress output
    into a live terminal progress bar, and saves the file into the resolved output

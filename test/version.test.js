@@ -8,13 +8,8 @@ test('CLI version matches package.json', () => {
   assert.equal(VERSION, packageJson.version);
 });
 
-test('npm package exposes the preferred and compatibility commands', () => {
+test('npm package exposes only the save command', () => {
   const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(packageJson.name, '@opiobonniky/vidfetch');
-  assert.deepEqual(Object.keys(packageJson.bin).sort(), [
-    'download-me',
-    'save',
-    'save-video',
-    'save-video-cli',
-  ]);
+  assert.equal(packageJson.name, '@opiobonniky/save');
+  assert.deepEqual(packageJson.bin, { save: 'bin/save.js' });
 });

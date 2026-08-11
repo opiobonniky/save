@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# Runs before removal. Nothing special needed since we don't touch
-# yt-dlp/ffmpeg/aria2c on uninstall — they may be used by other tools.
-exit 0

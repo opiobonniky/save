@@ -1,13 +1,10 @@
 {
-  "name": "@opiobonniky/vidfetch",
-  "version": "1.1.6",
+  "name": "@opiobonniky/save",
+  "version": "1.1.7",
   "description": "CLI tool to download videos from YouTube, TikTok, Facebook, and other platforms via yt-dlp",
   "type": "module",
   "bin": {
-    "save": "bin/save-video-cli.js",
-    "save-video-cli": "bin/save-video-cli.js",
-    "save-video": "bin/save-video-cli.js",
-    "download-me": "bin/save-video-cli.js"
+    "save": "bin/save.js"
   },
   "files": [
     "bin",
@@ -21,11 +18,11 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node bin/save-video-cli.js",
+    "start": "node bin/save.js",
     "test": "node --test",
     "setup:linux": "bash scripts/install-deps.sh",
-    "build:bundle": "esbuild bin/save-video-cli.js --bundle --platform=node --format=cjs --outfile=dist/save-video-cli.cjs",
-    "build:binary": "npm run build:bundle && pkg dist/save-video-cli.cjs --targets node18-linux-x64 --output dist/save-video-cli-linux",
+    "build:bundle": "esbuild bin/save.js --bundle --platform=node --format=cjs --outfile=dist/save.cjs",
+    "build:binary": "npm run build:bundle && pkg dist/save.cjs --targets node18-linux-x64 --output dist/save-linux",
     "build:standalone": "node scripts/build-standalone.mjs"
   },
   "pkg": {
@@ -45,11 +42,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/opiobonniky/download-me.git"
+    "url": "git+https://github.com/opiobonniky/save.git"
   },
-  "homepage": "https://github.com/opiobonniky/download-me#readme",
+  "homepage": "https://github.com/opiobonniky/save#readme",
   "bugs": {
-    "url": "https://github.com/opiobonniky/download-me/issues"
+    "url": "https://github.com/opiobonniky/save/issues"
   },
   "dependencies": {
     "chalk": "^4.1.2",

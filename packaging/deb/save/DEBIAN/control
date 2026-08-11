@@ -1,5 +1,5 @@
-Package: save-video-cli
-Version: 1.1.2-1
+Package: save
+Version: 1.1.7-1
 Section: utils
 Priority: optional
 Architecture: amd64
