@@ -5,6 +5,7 @@ set -e
 SOURCE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TARGET_DIR="/usr/local/lib/save-video-cli"
 TARGET_LINK="/usr/local/bin/save-video-cli"
+SAVE_LINK="/usr/local/bin/save"
 SHORT_LINK="/usr/local/bin/save-video"
 LEGACY_LINK="/usr/local/bin/download-me"
 
@@ -45,8 +46,9 @@ if [ "$SOURCE_DIR" != "$TARGET_DIR" ]; then
 fi
 as_root chmod +x "$TARGET_DIR/save-video-cli" "$TARGET_DIR/libexec/"*
 as_root ln -sf "$TARGET_DIR/save-video-cli" "$TARGET_LINK"
+as_root ln -sf "$TARGET_DIR/save-video-cli" "$SAVE_LINK"
 as_root ln -sf "$TARGET_DIR/save-video-cli" "$SHORT_LINK"
 as_root ln -sf "$TARGET_DIR/save-video-cli" "$LEGACY_LINK"
 
 echo "Installed to $TARGET_DIR"
-echo "Run: save-video-cli <url>"
+echo "Run: save <url>"

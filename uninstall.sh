@@ -4,6 +4,7 @@ set -e
 
 TARGET_DIR="/usr/local/lib/save-video-cli"
 TARGET_LINK="/usr/local/bin/save-video-cli"
+SAVE_LINK="/usr/local/bin/save"
 SHORT_LINK="/usr/local/bin/save-video"
 LEGACY_LINK="/usr/local/bin/download-me"
 
@@ -26,6 +27,7 @@ if [ ! -e "$TARGET_LINK" ] && [ ! -d "$TARGET_DIR" ]; then
 fi
 
 as_root rm -f "$TARGET_LINK"
+as_root rm -f "$SAVE_LINK"
 as_root rm -f "$SHORT_LINK"
 as_root rm -f "$LEGACY_LINK"
 as_root rm -rf "$TARGET_DIR"

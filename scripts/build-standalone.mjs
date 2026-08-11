@@ -100,9 +100,11 @@ const builtApp = path.join(root, 'dist', `save-video-cli-${platformName}-${arch}
 run(process.execPath, [pkgBin, 'dist/save-video-cli.cjs', '--targets', target.pkg, '--output', builtApp]);
 copyExecutable(builtApp, appPath);
 if (platform === 'win32') {
+  writeFileSync(path.join(packageDir, 'save.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
   writeFileSync(path.join(packageDir, 'save-video.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
   writeFileSync(path.join(packageDir, 'download-me.cmd'), '@echo off\r\n"%~dp0save-video-cli.exe" %*\r\n');
 } else {
+  symlinkSync('save-video-cli', path.join(packageDir, 'save'));
   symlinkSync('save-video-cli', path.join(packageDir, 'save-video'));
   symlinkSync('save-video-cli', path.join(packageDir, 'download-me'));
 }

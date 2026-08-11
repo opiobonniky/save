@@ -20,7 +20,7 @@ fi
 PROJECT_BIN="$(readlink -f "$(dirname "$0")/bin/save-video-cli.js")"
 GLOBAL_ROOT="$(npm root -g)"
 REMOVE_OLD=false
-for COMMAND_NAME in save-video-cli save-video download-me; do
+for COMMAND_NAME in save save-video-cli save-video download-me; do
   if ! command -v "$COMMAND_NAME" >/dev/null 2>&1; then
     continue
   fi
@@ -32,6 +32,7 @@ for COMMAND_NAME in save-video-cli save-video download-me; do
     "$GLOBAL_ROOT/save-video-cli/bin/download-me.js"|\
     "$GLOBAL_ROOT/save-video-cli/bin/save-video-cli.js"|\
     "$GLOBAL_ROOT/@opiobonniky/download-me/bin/download-me.js"|\
+    "$GLOBAL_ROOT/@opiobonniky/vidfetch/bin/save-video-cli.js"|\
     "$GLOBAL_ROOT/@opiobonniky/vidfetch/bin/download-me.js")
       REMOVE_OLD=true
       ;;
@@ -52,9 +53,9 @@ if [ "$REMOVE_OLD" = true ]; then
 fi
 
 # Installing globally from the local folder:
-# - registers save-video-cli, save-video, and the legacy download-me alias on PATH
+# - registers save plus the existing compatibility aliases on PATH
 npm install -g .
 
 echo ""
 echo "Installed. Try it from anywhere:"
-echo "  save-video-cli <url>"
+echo "  save <url>"

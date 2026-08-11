@@ -28,9 +28,9 @@ import { getFfmpegExecutablePath } from '../src/ffmpeg.js';
 const program = new Command();
 
 program
-  .name('save-video-cli')
+  .name('save')
   .description('Fast, friendly video and audio downloads powered by yt-dlp')
-  .usage('[options] <url> [outputDir]\n       save-video-cli --batch <file> [outputDir]\n       save-video-cli <command>')
+  .usage('[options] <url> [outputDir]\n       save --batch <file> [outputDir]\n       save <command>')
   .version(VERSION)
   .showSuggestionAfterError()
   .showHelpAfterError()
@@ -70,26 +70,26 @@ program
   .addHelpText('after', `
 Defaults:
   Quality is 1080p and connections is 4. Change saved defaults with:
-    save-video-cli config set quality 720p
-    save-video-cli config set connections 4
-    save-video-cli config set outputDir ~/Videos
+    save config set quality 720p
+    save config set connections 4
+    save config set outputDir ~/Videos
 
 Examples:
-  save-video-cli "https://youtu.be/VIDEO_ID"
-  save-video-cli "https://youtu.be/VIDEO_ID" ~/Videos --quality 720p
-  save-video-cli "https://youtu.be/VIDEO_ID" --choose
-  save-video-cli "https://youtu.be/VIDEO_ID" --audio
-  save-video-cli "https://youtu.be/VIDEO_ID" --subs en,fr
-  save-video-cli "https://youtube.com/playlist?list=LIST_ID"
-  save-video-cli --batch urls.txt ~/Videos --jobs 2
-  save-video-cli "https://example.com/large-video" --aria2 --connections 4
-  save-video-cli "https://example.com/video" --proxy "socks5://127.0.0.1:1080"
-  save-video-cli "https://youtu.be/VIDEO_ID" --timing
+  save "https://youtu.be/VIDEO_ID"
+  save "https://youtu.be/VIDEO_ID" ~/Videos --quality 720p
+  save "https://youtu.be/VIDEO_ID" --choose
+  save "https://youtu.be/VIDEO_ID" --audio
+  save "https://youtu.be/VIDEO_ID" --subs en,fr
+  save "https://youtube.com/playlist?list=LIST_ID"
+  save --batch urls.txt ~/Videos --jobs 2
+  save "https://example.com/large-video" --aria2 --connections 4
+  save "https://example.com/video" --proxy "socks5://127.0.0.1:1080"
+  save "https://youtu.be/VIDEO_ID" --timing
 
 Useful commands:
-  save-video-cli doctor          Check yt-dlp, ffmpeg, aria2c, and JS runtime support
-  save-video-cli config get      Show saved defaults
-  save-video-cli config reset    Restore all defaults
+  save doctor          Check yt-dlp, ffmpeg, aria2c, and JS runtime support
+  save config get      Show saved defaults
+  save config reset    Restore all defaults
 
 Notes:
   Always quote URLs containing ? or &; otherwise the shell may split or background the command.
@@ -97,18 +97,18 @@ Notes:
   Use --aria2 only when native downloading does not fill your connection.
   Respect site terms and content rights.`);
 
-// --- config subcommand: save-video-cli config <get|set|reset> ---
+// --- config subcommand: save config <get|set|reset> ---
 const configCmd = program
   .command('config')
   .description('view or change saved defaults')
   .addHelpText('after', `
 Examples:
-  save-video-cli config get
-  save-video-cli config set outputDir ~/Videos
-  save-video-cli config set quality 720p
-  save-video-cli config set connections 4
-  save-video-cli config set subLangs en,fr
-  save-video-cli config reset
+  save config get
+  save config set outputDir ~/Videos
+  save config set quality 720p
+  save config set connections 4
+  save config set subLangs en,fr
+  save config reset
 
 Known keys: outputDir, quality, connections, subLangs`);
 
@@ -260,7 +260,7 @@ async function run(url, outputDirArg, options) {
     return;
   }
 
-  console.log(chalk.blue('Fetching video info...'));
+  console.log(chalk.blue('Fetching video information...'));
   const result = await extractFormats(url, { proxy, flatPlaylist: likelyPlaylist });
   downloadOpts.preflightSeconds = (Date.now() - operationStartedAt) / 1000;
   console.log(chalk.green(`Found: ${result.title}`));

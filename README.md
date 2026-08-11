@@ -10,7 +10,7 @@ which does the actual site-specific extraction work.
 
 - **Playlists.** Paste a playlist URL and choose to download the whole thing
   or pick specific videos from an interactive checklist.
-- **Batch mode.** `save-video-cli --batch urls.txt` downloads every URL in a
+- **Batch mode.** `save --batch urls.txt` downloads every URL in a
   text file (one per line, `#` for comments), with bounded `--jobs` concurrency.
 - **Fast direct-video path.** Normal downloads skip the duplicate metadata
   request; full extraction only runs for format picking and playlists.
@@ -18,9 +18,9 @@ which does the actual site-specific extraction work.
   and unlimited `best` available through `--quality`.
 - **Friendly format picker.** Formats are labeled as 360p, 720p, 1080p, etc.;
   YouTube storyboard thumbnails are excluded from downloadable choices.
-- **Saved defaults.** `save-video-cli config set outputDir ~/Videos` remembers
+- **Saved defaults.** `save config set outputDir ~/Videos` remembers
   a default output directory (and default subtitle language) across runs.
-  `save-video-cli config get` / `config reset` to inspect or clear.
+  `save config get` / `config reset` to inspect or clear.
 - **Automatic retries.** Transient network failures retry automatically
   (10 attempts) instead of failing the whole download on one hiccup.
 - **Resume awareness.** Partial downloads resume automatically (yt-dlp's
@@ -57,7 +57,7 @@ and works particularly well for the DASH/HLS streams used by YouTube.
 For a large direct file, opt in to aria2c's multi-connection downloader:
 
 ```bash
-save-video-cli <url> --aria2
+save <url> --aria2
 ```
 
 aria2c can improve throughput when connection count is the bottleneck, but it
@@ -110,12 +110,12 @@ during the build, and macOS executables receive an ad-hoc signature.
 ### npm alternative
 
 ```bash
-npm install -g save-video-cli
-save-video-cli --version
+npm install -g @opiobonniky/vidfetch
+save --version
 ```
 
-`save-video-cli` is the primary command. `save-video` is a shorter equivalent,
-and the previous `download-me` command remains available for existing scripts.
+`save` is the primary command. The previous `save-video-cli`, `save-video`, and
+`download-me` commands remain available for existing scripts.
 
 The npm installation does not run `sudo` or modify system packages behind the
 scenes. On first use, the CLI downloads standalone yt-dlp and ffmpeg binaries,
@@ -148,7 +148,7 @@ installing the current one:
 
 ```bash
 npm uninstall -g download-me video-download-cli @opiobonniky/vidfetch
-npm install -g save-video-cli
+npm install -g @opiobonniky/vidfetch
 ```
 
 Do not use `npm install --force`; it can overwrite an unrelated executable.
@@ -162,7 +162,7 @@ resolved automatically:
 npm install
 npm run build:binary
 bash scripts/build-deb.sh
-sudo apt install ./dist/save-video-cli_1.1.5-1_amd64.deb
+sudo apt install ./dist/save-video-cli_1.1.6-1_amd64.deb
 ```
 
 Use `apt install ./file.deb`, including the `./`. Plain `install save-video-cli`
@@ -197,7 +197,7 @@ with a restricted `PATH`, and writes the release archive under `dist/`.
 Check the installed runtime at any time:
 
 ```bash
-save-video-cli doctor
+save doctor
 ```
 
 ## Uninstalling
@@ -205,7 +205,7 @@ save-video-cli doctor
 Use the command matching the installation method:
 
 ```bash
-npm uninstall -g save-video-cli
+npm uninstall -g @opiobonniky/vidfetch
 sudo apt remove save-video-cli
 bash uninstall.sh  # standalone installer
 ```
@@ -235,51 +235,51 @@ An unquoted `&` makes Bash run the downloader in the background, producing a
 
 ```bash
 # Zero-decision default: balanced 1080p, one extraction, no menu
-save-video-cli "https://youtube.com/watch?v=xyz"
+save "https://youtube.com/watch?v=xyz"
 
 # Select a quality preset, including unlimited best quality
-save-video-cli "https://youtube.com/watch?v=xyz" --quality 720p
-save-video-cli "https://youtube.com/watch?v=xyz" --quality best
+save "https://youtube.com/watch?v=xyz" --quality 720p
+save "https://youtube.com/watch?v=xyz" --quality best
 
 # Want control over the exact format instead? Opt in explicitly:
-save-video-cli "https://youtube.com/watch?v=xyz" --choose
+save "https://youtube.com/watch?v=xyz" --choose
 
 # Save to a specific directory (trailing argument)
-save-video-cli "https://youtube.com/watch?v=xyz" ~/Videos
+save "https://youtube.com/watch?v=xyz" ~/Videos
 
 # Skip straight to a known format id (no picker)
-save-video-cli "https://youtube.com/watch?v=xyz" -f 137
+save "https://youtube.com/watch?v=xyz" -f 137
 
 # Audio only (best available audio track, converted to mp3)
-save-video-cli "https://youtube.com/watch?v=xyz" --audio
+save "https://youtube.com/watch?v=xyz" --audio
 
 # Subtitles alongside the video
-save-video-cli "https://youtube.com/watch?v=xyz" --subs en,es
+save "https://youtube.com/watch?v=xyz" --subs en,es
 
 # Just list formats without downloading
-save-video-cli "https://youtube.com/watch?v=xyz" --list-formats
+save "https://youtube.com/watch?v=xyz" --list-formats
 
 # Playlist — prompts to download all or pick specific videos
-save-video-cli "https://youtube.com/playlist?list=xyz"
+save "https://youtube.com/playlist?list=xyz"
 
 # Batch mode with two simultaneous downloads
-save-video-cli --batch urls.txt ~/Videos --jobs 2
+save --batch urls.txt ~/Videos --jobs 2
 
 # Force a fresh download even if the file already exists
-save-video-cli "https://youtube.com/watch?v=xyz" --overwrite
+save "https://youtube.com/watch?v=xyz" --overwrite
 
 # Opt in to aria2c for a large direct file (slower startup)
-save-video-cli "https://youtube.com/watch?v=xyz" --aria2 --connections 4
+save "https://youtube.com/watch?v=xyz" --aria2 --connections 4
 
 # Print startup, transfer, processing, and total timings
-save-video-cli "https://youtube.com/watch?v=xyz" --timing
+save "https://youtube.com/watch?v=xyz" --timing
 
 # Route requests through a local HTTP or SOCKS proxy
-save-video-cli "https://example.com/video" --proxy "socks5://127.0.0.1:1080"
+save "https://example.com/video" --proxy "socks5://127.0.0.1:1080"
 
 # Save performance defaults
-save-video-cli config set quality 720p
-save-video-cli config set connections 4
+save config set quality 720p
+save config set connections 4
 ```
 
 If a site is blocked by the local network, connect a system-wide VPN before
