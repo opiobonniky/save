@@ -1,7 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  detectBackgroundedRun,
+  getDefaultDownloadsDir,
   isLikelyPlaylistUrl,
+  looksShellTruncated,
   normalizeMediaUrl,
   parseCount,
   parseProxy,
@@ -88,5 +91,63 @@ describe('media URL normalization', () => {
   test('does not modify unrelated URLs', () => {
     const url = 'https://youtu.be/abc?si=tracking';
     assert.equal(normalizeMediaUrl(url), url);
+  });
+});
+
+describe('shell truncation detection', () => {
+  test('flags a dangling query value from a split "&"', () => {
+    assert.equal(looksShellTruncated('https://youtu.be/abc?si=1&t='), true);
+  });
+
+  test('flags a bare trailing question mark', () => {
+    assert.equal(looksShellTruncated('https://youtu.be/abc?'), true);
+  });
+
+  test('accepts complete query strings', () => {
+    assert.equal(looksShellTruncated('https://youtu.be/abc?si=1&t=2'), false);
+    assert.equal(looksShellTruncated('https://youtu.be/abc'), false);
+  });
+});
+
+describe('default downloads directory', () => {
+  test('defaults to the user Downloads folder', () => {
+    assert.equal(getDefaultDownloadsDir({ home: '/home/alice' }), '/home/alice/Downloads');
+  });
+
+  test('honors the XDG_DOWNLOAD_DIR override on Linux', () => {
+    assert.equal(
+      getDefaultDownloadsDir({ home: '/home/alice', xdgDownloadDir: '/mnt/big/downloads' }),
+      '/mnt/big/downloads'
+    );
+  });
+});
+
+describe('backgrounded run detection', () => {
+  test('detects a command backgrounded by an unquoted "&"', () => {
+    assert.equal(
+      detectBackgroundedRun({ stdinTTY: false, stdoutTTY: true, stderrTTY: true }),
+      true
+    );
+  });
+
+  test('does not flag a normal interactive terminal', () => {
+    assert.equal(
+      detectBackgroundedRun({ stdinTTY: true, stdoutTTY: true, stderrTTY: true }),
+      false
+    );
+  });
+
+  test('does not flag batch mode reading from a file', () => {
+    assert.equal(
+      detectBackgroundedRun({ stdinTTY: false, stdoutTTY: true, stderrTTY: true, batchMode: true }),
+      false
+    );
+  });
+
+  test('does not flag a fully redirected run (e.g. piped output)', () => {
+    assert.equal(
+      detectBackgroundedRun({ stdinTTY: false, stdoutTTY: false, stderrTTY: false }),
+      false
+    );
   });
 });

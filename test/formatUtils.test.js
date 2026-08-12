@@ -7,7 +7,7 @@ import {
   formatKind,
   formatQuality,
   formatRow,
-  formatChoiceLabel,
+  buildPickerChoices,
 } from '../src/formatUtils.js';
 
 describe('isVideoOnly', () => {
@@ -91,15 +91,66 @@ describe('formatRow', () => {
   });
 });
 
-describe('formatChoiceLabel', () => {
-  test('tags video-only formats with a merge hint', () => {
-    const label = formatChoiceLabel({ format_id: '137', ext: 'mp4', resolution: '1920x1080', height: 1080, filesize: 1000000, vcodec: 'avc1', acodec: 'none' });
-    assert.match(label, /^1080p/);
-    assert.match(label, /ID 137/);
-    assert.match(label, /video only — audio merged automatically/);
+describe('buildPickerChoices', () => {
+  const mp4 = (format_id, quality, filesize, vcodec = 'avc1', acodec = 'mp4a') => ({
+    format_id,
+    ext: 'mp4',
+    resolution: quality,
+    height: Number(quality.replace('p', '')),
+    filesize,
+    vcodec,
+    acodec,
   });
-  test('does not tag combined formats', () => {
-    const label = formatChoiceLabel({ format_id: '22', ext: 'mp4', resolution: '720p', filesize: 1000000, vcodec: 'avc1', acodec: 'mp4a' });
-    assert.doesNotMatch(label, /merged automatically/);
+
+  test('collapses duplicate formats of the same resolution into one row', () => {
+    const choices = buildPickerChoices([
+      mp4('h264_540p_1-0', '576p', 4900000),
+      mp4('h264_540p_1-1', '576p', 4900000),
+      mp4('bytevc1_540p_2-0', '576p', 2400000),
+      mp4('h264_720p_1-0', '720p', 5800000),
+    ]);
+    const labels = choices.map(c => c.name);
+    assert.equal(choices.filter(c => /576p/.test(c.name)).length, 1);
+    assert.equal(choices.filter(c => /720p/.test(c.name)).length, 1);
+    assert.ok(labels.some(l => /recommended/.test(l)));
+  });
+
+  test('leads with a best-quality recommended option', () => {
+    const choices = buildPickerChoices([mp4('a', '720p', 5000000), mp4('b', '480p', 3000000)]);
+    assert.equal(choices[0].name, 'Best quality (recommended)');
+    assert.equal(choices[0].value, 'bestvideo+bestaudio/best');
+  });
+
+  test('orders quality tiers from highest to lowest', () => {
+    const choices = buildPickerChoices([
+      mp4('low', '480p', 3000000),
+      mp4('high', '1080p', 9000000),
+      mp4('mid', '720p', 5000000),
+    ]);
+    const qualityLabels = choices.slice(1).map(c => c.name);
+    assert.match(qualityLabels[0], /^1080p/);
+    assert.match(qualityLabels[0], /9\.0MB/);
+    assert.match(qualityLabels[1], /^720p/);
+    assert.match(qualityLabels[2], /^480p/);
+  });
+
+  test('keeps real format ids as values', () => {
+    const choices = buildPickerChoices([mp4('h264_540p_1-0', '576p', 4900000)]);
+    assert.equal(choices[1].value, 'h264_540p_1-0');
+  });
+
+  test('appends a single Audio (MP3) option', () => {
+    const audio = { format_id: '140', ext: 'm4a', filesize: 11900000, vcodec: 'none', acodec: 'mp4a' };
+    const choices = buildPickerChoices([audio, mp4('v', '720p', 5000000)]);
+    const last = choices[choices.length - 1];
+    assert.equal(last.value, 'mp3');
+    assert.match(last.name, /MP3/i);
+  });
+
+  test('offers only audio when there are no video formats', () => {
+    const audio = { format_id: '140', ext: 'm4a', filesize: 11900000, vcodec: 'none', acodec: 'mp4a' };
+    const choices = buildPickerChoices([audio]);
+    assert.equal(choices.length, 1);
+    assert.equal(choices[0].value, 'mp3');
   });
 });

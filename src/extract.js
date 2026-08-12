@@ -40,12 +40,65 @@ export function getExtractOptions(options = {}) {
     flatPlaylist: options.flatPlaylist,
     proxy: options.proxy,
     ...getYtDlpRuntimeOptions(),
+    ...(options.userAgent ? { userAgent: options.userAgent } : {}),
+    ...(options.cookiesFromBrowser ? { cookiesFromBrowser: options.cookiesFromBrowser } : {}),
   };
 }
 
 export function isRetryableExtractionError(error) {
   const detail = `${error?.stderr || ''}\n${error?.message || ''}`;
   return /unable to extract universal data|unexpected response|timed? out|connection reset|HTTP Error (?:429|5\d\d)/i.test(detail);
+}
+
+const EXTRACTION_ERROR_HINTS = [
+  {
+    re: /video unavailable|this video has been removed|this video is no longer available|unavailable for legal reasons/i,
+    message: 'This video is unavailable (removed, private, or deleted).',
+  },
+  {
+    re: /private video|this video is private/i,
+    message: 'This video is private and requires access.',
+  },
+  {
+    re: /georestrict|not available in your country|blocked in your country|watch on .* to view/i,
+    message: 'This video is blocked in your region — try a VPN or pass --proxy.',
+  },
+  {
+    re: /sign in to confirm|please verify you are a human|bot detection/i,
+    message: 'The site asked for a browser check (bot detection) — retry, or use a different network or --proxy.',
+  },
+  {
+    re: /timed? out|timeout|ECONNRESET|ECONNREFUSED|ENOTFOUND|name or service not known|connection reset|failed to resolve|couldn't connect/i,
+    message: 'Could not reach the site — check your network, use a VPN, or pass --proxy.',
+  },
+  {
+    re: /HTTP Error (?:429|5\d\d)/i,
+    message: 'The site returned an error or is rate-limiting — wait a moment and retry.',
+  },
+  {
+    re: /requires login|login required|log in to confirm/i,
+    message: 'This content requires a login — pass real browser cookies (yt-dlp --cookies-from-browser).',
+  },
+  {
+    re: /unable to extract/i,
+    message:
+      'The site changed its layout or is serving an anti-bot challenge, so yt-dlp cannot parse it yet (an upstream issue). Try again later, update yt-dlp, or pass browser cookies with --cookies-from-browser <browser>.',
+  },
+];
+
+/** A short, human explanation for a failed extraction, or null when unknown. */
+export function explainExtractionError(error) {
+  const detail = `${error?.stderr || ''}\n${error?.message || ''}`;
+  for (const hint of EXTRACTION_ERROR_HINTS) {
+    if (hint.re.test(detail)) return hint.message;
+  }
+  return null;
+}
+
+/** The site name yt-dlp reported in its error, e.g. "imdb" from "[imdb] ...". */
+export function extractionSiteName(error) {
+  const match = `${error?.stderr || ''}`.match(/\[([A-Za-z0-9:_]+)\]/);
+  return match ? match[1] : null;
 }
 
 /**
@@ -71,8 +124,13 @@ export async function extractFormats(url, options = {}) {
     }
   }
   if (!info && lastError) {
-    const detail = lastError.stderr ? `\n${lastError.stderr.trim()}` : lastError.message;
-    throw new Error(`Could not read this URL.${detail}`);
+    const detail = lastError.stderr?.trim() || lastError.message;
+    const explanation = explainExtractionError(lastError);
+    const site = extractionSiteName(lastError);
+    const headline = explanation
+      ? `${explanation}${site ? ` (site: ${site})` : ''}`
+      : 'Could not read video information from this URL.';
+    throw new Error(`${headline}\n\n${detail}`);
   }
 
   if (!info) {

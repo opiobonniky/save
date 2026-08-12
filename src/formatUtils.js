@@ -51,11 +51,49 @@ export function formatRow(f) {
   );
 }
 
-/** A single choice label for the interactive inquirer picker. */
-export function formatChoiceLabel(f) {
-  const tag = isVideoOnly(f) ? ' (video only — audio merged automatically)' : '';
-  return (
-    `${formatQuality(f).padEnd(10)} | ${f.ext.padEnd(5)} | ${formatSize(f.filesize).padEnd(10)} | ` +
-    `ID ${f.format_id}${tag}`
-  );
+/** One simplified label for the interactive picker, without cryptic format IDs. */
+export function pickerLabel(f) {
+  return `${formatQuality(f).padEnd(10)} | ${f.ext.padEnd(5)} | ${formatSize(f.filesize).padEnd(8)}`;
+}
+
+function qualityRankOf(f) {
+  const match = String(formatQuality(f)).match(/(\d+)p/i);
+  return match ? Number(match[1]) : -1;
+}
+
+/**
+ * Builds a small, human-friendly format menu from yt-dlp's full format list.
+ * Sites like TikTok return many near-duplicate formats per resolution; normal
+ * users just want "one row per quality", so we collapse each quality tier down
+ * to its best single format (preferring combined video+audio, then the largest
+ * file). Each row keeps a real yt-dlp format id so downloads work exactly as
+ * before, and a "Best quality" option covers the highest available resolution.
+ */
+export function buildPickerChoices(formats) {
+  const hasVideo = formats.some(f => !isAudioOnly(f));
+  const hasAudio = formats.some(f => isAudioOnly(f) || !isVideoOnly(f));
+
+  const byQuality = new Map();
+  for (const f of formats) {
+    if (isAudioOnly(f)) continue;
+    const quality = formatQuality(f);
+    const existing = byQuality.get(quality);
+    const rank = item => (isVideoOnly(item) ? 0 : 1) * 1e9 + (item.filesize || 0);
+    if (!existing || rank(f) > rank(existing)) byQuality.set(quality, f);
+  }
+
+  // Only show tiers with a known quality — "Best quality" already covers the rest,
+  // and a row like "video | mp4 | ?" only confuses normal users.
+  const tiers = [...byQuality.values()]
+    .sort((a, b) => qualityRankOf(b) - qualityRankOf(a))
+    .filter(f => qualityRankOf(f) >= 0);
+
+  const choices = [];
+  if (hasVideo) {
+    choices.push({ name: 'Best quality (recommended)', value: 'bestvideo+bestaudio/best' });
+    for (const f of tiers) choices.push({ name: pickerLabel(f), value: f.format_id });
+  }
+  // mp3 is never a format a site serves — it's a conversion done with ffmpeg.
+  if (hasAudio) choices.push({ name: 'Audio only (MP3)', value: 'mp3' });
+  return choices;
 }

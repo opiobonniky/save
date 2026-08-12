@@ -11,7 +11,10 @@ import { formatRow, isVideoOnly } from '../src/formatUtils.js';
 import { checkDependencies } from '../src/checkDeps.js';
 import { getConfig } from '../src/config.js';
 import {
+  detectBackgroundedRun,
+  getDefaultDownloadsDir,
   isLikelyPlaylistUrl,
+  looksShellTruncated,
   parseCount,
   parseProxy,
   resolveMediaUrl,
@@ -36,7 +39,7 @@ program
   .showHelpAfterError()
   .configureHelp({ sortSubcommands: true })
   .argument('[url]', 'video, audio, or playlist URL (quote URLs containing & or ?)')
-  .argument('[outputDir]', 'destination directory (current directory or saved default)')
+  .argument('[outputDir]', 'destination directory (your Downloads folder by default, or a saved default)')
   .option('-f, --format <id>', 'use an exact yt-dlp format ID; inspect IDs with --list-formats')
   .option('-q, --quality <preset>', 'quality: 360p, 480p, 720p, 1080p, 1440p, 2160p, or best')
   .option('--choose', 'open the interactive format picker (the default without a selection flag)')
@@ -46,6 +49,8 @@ program
   .option('--subs [langs]', 'save SRT subtitles; languages are comma-separated (default: en)')
   .option('--aria2', 'opt in to aria2c for large direct files (slower startup)')
   .option('--proxy <url>', 'route site requests through an HTTP(S) or SOCKS proxy')
+  .option('--user-agent <ua>', 'custom browser User-Agent (default: a current Chrome UA to pass bot checks)')
+  .option('--cookies-from-browser <browser>', 'use cookies from your browser to pass login/bot/WAF checks (chrome, firefox, edge, brave, safari...)')
   .option('-N, --connections <count>', 'native fragment or aria2 connection count, 1-16 (default: 4)')
   .option('-j, --jobs <count>', 'simultaneous batch downloads, 1-4', '1')
   .option('--timing', 'print preflight, startup, transfer, processing, and total times')
@@ -201,7 +206,7 @@ async function resolveOutputDir(outputDirArg) {
   const cfg = getConfig();
   const saved = cfg.get('outputDir');
   if (saved) return saved;
-  return process.cwd();
+  return getDefaultDownloadsDir();
 }
 
 function ensureOutputDir(outputDir) {
@@ -221,7 +226,29 @@ function ensureOutputDir(outputDir) {
 }
 
 async function run(url, outputDirArg, options) {
+  const backgrounded = detectBackgroundedRun();
+  if (backgrounded) {
+    console.error(
+      chalk.red.bold(
+        '\nThis command was split by your shell: the URL is not quoted and contains "&",\n' +
+          'so the terminal ran save in the background and cut the URL at the "&".\n' +
+          'A backgrounded save cannot ask you to choose a format.\n'
+      ) +
+        chalk.yellow(
+          `To run it in the foreground instead, quote the URL:\n  save "${url}"\n`
+        ) +
+        chalk.gray('Continuing this background run automatically with best available quality.\n')
+    );
+  }
   url = await resolveMediaUrl(url);
+  if (!options.batchMode && looksShellTruncated(url)) {
+    console.warn(
+      chalk.yellow(
+        'Note: this URL looks like it may have been cut off by an unquoted "&".\n' +
+          'Tip: quote the whole URL, e.g.  save "https://example.com/watch?v=1&t=2"'
+      )
+    );
+  }
   const operationStartedAt = Date.now();
   if (!getYtDlpExecutablePath()) await ensureManagedYtDlp();
   if (!getFfmpegExecutablePath()) await ensureManagedFfmpeg();
@@ -235,6 +262,8 @@ async function run(url, outputDirArg, options) {
   const qualitySelector = quality ? resolveQualitySelector(quality) : null;
   const connections = parseCount(options.connections || cfg.get('connections') || 4, 'connections');
   const proxy = parseProxy(options.proxy);
+  const userAgent = options.userAgent;
+  const cookiesFromBrowser = options.cookiesFromBrowser;
   const downloadOpts = {
     audio: !!options.audio,
     overwrite: !!options.overwrite,
@@ -245,6 +274,8 @@ async function run(url, outputDirArg, options) {
     timing: !!options.timing,
     noProgress: !!options.noProgress,
     proxy,
+    userAgent,
+    cookiesFromBrowser,
   };
 
   const likelyPlaylist = isLikelyPlaylistUrl(url);
@@ -268,7 +299,7 @@ async function run(url, outputDirArg, options) {
   }
 
   console.log(chalk.blue('Fetching video information...'));
-  const result = await extractFormats(url, { proxy, flatPlaylist: likelyPlaylist });
+  const result = await extractFormats(url, { proxy, flatPlaylist: likelyPlaylist, userAgent, cookiesFromBrowser });
   downloadOpts.preflightSeconds = (Date.now() - operationStartedAt) / 1000;
   console.log(chalk.green(`Found: ${result.title}`));
 
@@ -299,11 +330,24 @@ async function run(url, outputDirArg, options) {
   let formatId = options.format;
   if (!formatId) {
     if (options.choose || !quality) {
-      formatId = await pickFormat(formats);
+      if (process.stdin.isTTY) {
+        formatId = await pickFormat(formats);
+      } else {
+        formatId = 'bestvideo+bestaudio/best';
+        console.log(chalk.gray('Non-interactive terminal: using best available quality.'));
+      }
     } else {
       formatId = qualitySelector;
       console.log(chalk.gray(`Using ${quality} quality.`));
     }
+  }
+
+  if (formatId === 'mp3') {
+    checkDependencies({ requireFfmpeg: true });
+    console.log(chalk.gray('Downloading best audio and converting to MP3...'));
+    console.log(chalk.gray(`Saving to: ${outputDir}`));
+    await downloadVideo(url, 'bestaudio', outputDir, { ...downloadOpts, audio: true });
+    return;
   }
 
   const chosen = formats.find(f => f.format_id === formatId);
@@ -328,8 +372,9 @@ async function handlePlaylist(url, result, outputDir, options) {
   checkDependencies({ requireFfmpeg: true }); // playlist downloads merge video+audio by default
 
   // Batch/non-interactive mode: don't block on a prompt — just grab the whole playlist.
-  if (options.batchMode) {
-    console.log(chalk.gray('Batch mode: downloading entire playlist automatically.'));
+  if (options.batchMode || !process.stdin.isTTY) {
+    if (options.batchMode) console.log(chalk.gray('Batch mode: downloading entire playlist automatically.'));
+    else console.log(chalk.gray('Non-interactive terminal: downloading the entire playlist automatically.'));
     console.log(chalk.gray(`Saving to: ${outputDir}`));
     await downloadPlaylist(url, outputDir, getPlaylistOptions(options));
     return;
@@ -385,6 +430,8 @@ function getPlaylistOptions(options) {
     subLangs: typeof options.subs === 'string' ? options.subs : cfg.get('subLangs'),
     noProgress: !!options.noProgress,
     proxy: parseProxy(options.proxy),
+    userAgent: options.userAgent,
+    cookiesFromBrowser: options.cookiesFromBrowser,
   };
 }
 

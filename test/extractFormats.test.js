@@ -1,6 +1,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { getExtractOptions, isRetryableExtractionError, normalizeFormats } from '../src/extract.js';
+import {
+  explainExtractionError,
+  extractionSiteName,
+  getExtractOptions,
+  isRetryableExtractionError,
+  normalizeFormats,
+} from '../src/extract.js';
 
 describe('format normalization', () => {
   test('removes YouTube storyboard formats', () => {
@@ -37,4 +43,39 @@ test('retries transient extraction failures but not permanent errors', () => {
   assert.equal(isRetryableExtractionError({ stderr: 'Unable to extract universal data for rehydration' }), true);
   assert.equal(isRetryableExtractionError({ stderr: 'HTTP Error 429: Too Many Requests' }), true);
   assert.equal(isRetryableExtractionError({ stderr: 'This video is private' }), false);
+});
+
+describe('explainExtractionError', () => {
+  test('explains an upstream site-layout failure', () => {
+    const message = explainExtractionError({
+      stderr: 'ERROR: [imdb] 3877612057: Unable to extract next.js data',
+    });
+    assert.match(message, /site changed its layout/);
+    assert.match(message, /cookies-from-browser/);
+  });
+
+  test('explains an unavailable video', () => {
+    const message = explainExtractionError({ stderr: 'ERROR: [youtube] abcd: Video unavailable' });
+    assert.match(message, /unavailable/);
+  });
+
+  test('explains a region block', () => {
+    const message = explainExtractionError({ stderr: 'This video is not available in your country' });
+    assert.match(message, /blocked in your region/);
+  });
+
+  test('explains a network failure', () => {
+    const message = explainExtractionError({ stderr: 'Name or service not known' });
+    assert.match(message, /Could not reach the site/);
+  });
+
+  test('returns null for unknown errors', () => {
+    assert.equal(explainExtractionError({ stderr: 'something else entirely' }), null);
+  });
+
+  test('extracts the reported site name', () => {
+    assert.equal(extractionSiteName({ stderr: 'ERROR: [imdb] 3877612057: Unable to extract' }), 'imdb');
+    assert.equal(extractionSiteName({ stderr: 'ERROR: [youtube:playlist] x' }), 'youtube:playlist');
+    assert.equal(extractionSiteName({ stderr: 'no brackets here' }), null);
+  });
 });

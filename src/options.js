@@ -1,3 +1,6 @@
+import os from 'os';
+import path from 'path';
+
 export const QUALITY_SELECTORS = {
   best: 'bestvideo+bestaudio/best',
   '2160p': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
@@ -64,6 +67,38 @@ export function normalizeMediaUrl(value) {
     // Leave invalid input untouched so yt-dlp can report the original error.
   }
   return value;
+}
+
+export function looksShellTruncated(value) {
+  if (/[?&]$/.test(value)) return true;
+  try {
+    const search = new URL(value).search;
+    if (/[?&][^&=]*=$/.test(search)) return true;
+  } catch {
+    // Not parseable as a URL — not something we can diagnose here.
+  }
+  return false;
+}
+
+export function detectBackgroundedRun({
+  stdinTTY,
+  stdoutTTY,
+  stderrTTY,
+  batchMode = false,
+} = {}) {
+  const stdinInteractive = stdinTTY ?? !!process.stdin.isTTY;
+  const stdoutInteractive = stdoutTTY ?? !!process.stdout.isTTY;
+  const stderrInteractive = stderrTTY ?? !!process.stderr.isTTY;
+  return !batchMode && !stdinInteractive && (stdoutInteractive || stderrInteractive);
+}
+
+export function getDefaultDownloadsDir({
+  home = os.homedir(),
+  platform = process.platform,
+  xdgDownloadDir = process.env.XDG_DOWNLOAD_DIR,
+} = {}) {
+  if (xdgDownloadDir) return xdgDownloadDir;
+  return path.join(home, 'Downloads');
 }
 
 export async function resolveMediaUrl(value, fetchImpl = globalThis.fetch) {

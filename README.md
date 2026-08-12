@@ -16,11 +16,17 @@ which does the actual site-specific extraction work.
   `--quality`, `--format`, or `--audio` selects a non-interactive mode.
 - **Quality presets.** Skip the picker with a preset from 360p through 2160p,
   or use unlimited `best` through `--quality`.
-- **Friendly format picker.** Formats are labeled as 360p, 720p, 1080p, etc.;
-  YouTube storyboard thumbnails are excluded from downloadable choices.
+- **Friendly format picker.** A simple menu shows one row per quality — `720p |
+  mp4 | 5.8MB`, `576p | mp4 | 4.9MB` — with a **Best quality (recommended)**
+  option on top and an **Audio only (MP3)** conversion at the bottom. Cryptic
+  format IDs are hidden (duplicate TikTok/YouTube variants are collapsed); power
+  users can still see every ID with `--list-formats`. YouTube storyboard
+  thumbnails are excluded from downloadable choices.
 - **Saved defaults.** `save config set outputDir ~/Videos` remembers
   a default output directory (and default subtitle language) across runs.
   `save config get` / `config reset` to inspect or clear.
+  Without an explicit directory, downloads go to your **Downloads folder**
+  (`~/Downloads`, or `XDG_DOWNLOAD_DIR` when configured).
 - **Automatic retries.** Transient network failures retry automatically
   (10 attempts) instead of failing the whole download on one hiccup.
 - **Resume awareness.** Partial downloads resume automatically (yt-dlp's
@@ -147,15 +153,20 @@ an unrelated executable.
 
 ### Debian and Ubuntu
 
-Build and install the local Debian package with apt so its dependencies are
-resolved automatically:
+Build and install the self-contained Debian package with apt:
 
 ```bash
 npm install
-npm run build:binary
+npm run build:standalone
 bash scripts/build-deb.sh
 sudo apt install ./dist/save_1.1.7-1_amd64.deb
 ```
+
+The `.deb` is the same dependency-free application as the standalone archive: it
+bundles the app runtime plus its own yt-dlp, ffmpeg, ffprobe, and Deno binaries,
+so no media tools (or Node.js, Python, etc.) need to be installed on the target
+system. Only `aria2c` remains an optional recommendation for multi-connection
+acceleration.
 
 Use `apt install ./file.deb`, including the `./`. Plain `install save` is a
 different Linux file-copy command, while `dpkg -i` does not resolve missing
@@ -182,8 +193,8 @@ with a restricted `PATH`, and writes the release archive under `dist/`.
 
 - Dependency-free archives: no separately installed software
 - npm installations: Node.js 18+; yt-dlp is prepared automatically on first use
-- Debian package: system `yt-dlp` and ffmpeg packages
-- npm/ Debian: Deno 2.3+ or Node.js 22+ for full YouTube JavaScript challenge support
+- Debian package: self-contained, same bundled tools as the dependency-free archive
+- npm installation: Deno 2.3+ or Node.js 22+ for full YouTube JavaScript challenge support
 - `aria2c` optional for multi-connection acceleration (`aria2` package on apt)
 
 Check the installed runtime at any time:
@@ -206,14 +217,26 @@ System media tools are left installed because other applications may use them.
 
 ## Known limitations
 
+- **TikTok bot detection.** TikTok periodically serves an anti-bot challenge
+  instead of the video page, which yt-dlp reports as *"Unexpected response from
+  webpage request"* or *"Unable to extract universal data for rehydration"*.
+  `save` sends a current Chrome User-Agent by default (the widely-confirmed
+  workaround; override with `--user-agent`), but failures can still be
+  intermittent — retry, use a different network or `--proxy`, and consider
+  browser cookies if it persists.
+- **Bot/WAF-protected sites (e.g. IMDb, some news sites).** Some sites sit behind
+  a web-application firewall that serves a challenge instead of the video page,
+  so yt-dlp fails with *"Unable to extract ... data"*. Open the page in your
+  browser first (it solves the challenge and saves a token cookie), then pass it
+  through with `save <url> --cookies-from-browser <browser>`.
 - **TikTok photo carousels are not video streams.** TikTok short links and
   `/photo/` routes are normalized so yt-dlp can inspect them, but yt-dlp may
   expose only the post's audio track rather than the carousel images.
 - **Video-only formats use ffmpeg.** Many high-resolution formats (1080p+ on
   YouTube, for example) ship video and audio as separate streams. This tool
-  detects that automatically and merges in the best audio track for you. npm
-  installations and dependency-free archives include ffmpeg; Debian uses the
-  system package.
+  detects that automatically and merges in the best audio track for you.
+  Dependency-free archives, the Debian package, and npm installations all
+  include ffmpeg.
 - **Progress percentage isn't shown for a small number of streams** (some
   live/unknown-size streams use a yt-dlp progress format with no percentage
   at all). The download still completes correctly and displays its live speed.
@@ -272,6 +295,13 @@ save "https://youtube.com/watch?v=xyz" --timing
 # Route requests through a local HTTP or SOCKS proxy
 save "https://example.com/video" --proxy "socks5://127.0.0.1:1080"
 
+# Send a different browser User-Agent (a current Chrome UA is sent by default)
+save "https://example.com/video" --user-agent "Mozilla/5.0 ..."
+
+# Pass your browser's cookies for sites behind login or bot/WAF challenges
+# (first open the page in that browser so it has the right cookies)
+save "https://www.imdb.com/video/vi..." --cookies-from-browser chrome
+
 # Save performance defaults
 save config set quality 720p
 save config set connections 4
@@ -301,9 +331,11 @@ save/
 │   ├── formatUtils.js           # shared format display/merge-detection helpers
 │   └── checkDeps.js               # runtime safety-net dependency check
 ├── scripts/
-│   └── install-deps.sh       # auto-installs yt-dlp/ffmpeg (used by both install paths)
+│   ├── build-standalone.mjs     # builds the dependency-free archive (pkg + bundled tools)
+│   └── build-deb.sh             # builds the self-contained .deb from the archive
 ├── dist/
-│   └── save-linux          # prebuilt standalone binary (after npm run build:binary)
+│   ├── save-<version>-linux-x64/   # dependency-free app: save + libexec/{yt-dlp,ffmpeg,ffprobe,deno}
+│   └── save_<version>_amd64.deb    # self-contained Debian package (after npm run build:standalone + build-deb.sh)
 ├── install.sh                  # installs via npm (machine already has Node.js)
 ├── install-standalone.sh         # installs the bundled binary (no Node.js needed)
 ├── package.json
@@ -318,7 +350,7 @@ save/
 3. `prompt.js` shows the format or playlist picker only when interaction is needed.
 4. `download.js` runs the download, parsing its progress output
    into a live terminal progress bar, and saves the file into the resolved output
-   directory (current directory by default, or the trailing path argument).
+   directory (your Downloads folder by default, or the trailing path argument).
 
 ## A note on responsible use
 

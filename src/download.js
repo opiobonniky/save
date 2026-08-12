@@ -98,6 +98,8 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     ...getFfmpegOptions(),
   };
 
+  if (opts.userAgent) ytdlOptions.userAgent = opts.userAgent;
+  if (opts.cookiesFromBrowser) ytdlOptions.cookiesFromBrowser = opts.cookiesFromBrowser;
   if (opts.noPlaylist) ytdlOptions.noPlaylist = true;
 
   const usingAria2c = opts.aria2 && canRun('aria2c');
@@ -189,6 +191,8 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     bar.stop();
     const hint = /(?:timed? out|timeout)/i.test(stderrBuffer)
       ? '\n(The site connection timed out. Check your network, use a system-wide VPN, or pass --proxy <url> if the site is blocked.)'
+      : /\[TikTok\].*(?:Unexpected response|universal data)/i.test(stderrBuffer)
+      ? '\n(TikTok served a bot-detection page. Retry, use a different network or --proxy, or pass --cookies-from-browser-like real browser cookies. A Chrome user-agent is already sent by default; override with --user-agent.)'
       : /ffmpeg/i.test(stderrBuffer)
       ? '\n(ffmpeg processing failed. Run save doctor and reinstall the package if ffmpeg is missing.)'
       : usingAria2c
@@ -272,6 +276,8 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     ...getFfmpegOptions(),
   };
 
+  if (opts.userAgent) ytdlOptions.userAgent = opts.userAgent;
+  if (opts.cookiesFromBrowser) ytdlOptions.cookiesFromBrowser = opts.cookiesFromBrowser;
   if (opts.playlistItems?.length) ytdlOptions.playlistItems = opts.playlistItems.join(',');
   if (opts.overwrite) ytdlOptions.forceOverwrites = true;
   if (opts.subs) {
