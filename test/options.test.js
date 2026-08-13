@@ -88,6 +88,48 @@ describe('media URL normalization', () => {
     );
   });
 
+  test('strips share tracking parameters from YouTube Shorts URLs', () => {
+    assert.equal(
+      normalizeMediaUrl('https://youtube.com/shorts/abc123?si=tracking&feature=share'),
+      'https://youtube.com/shorts/abc123'
+    );
+  });
+
+  test('keeps meaningful parameters on YouTube Shorts URLs', () => {
+    assert.equal(
+      normalizeMediaUrl('https://youtube.com/shorts/abc123?t=30'),
+      'https://youtube.com/shorts/abc123?t=30'
+    );
+  });
+
+  test('strips tracking parameters from Instagram reels', () => {
+    assert.equal(
+      normalizeMediaUrl(
+        'https://www.instagram.com/reel/AbCdEf/?igsh=xyz&utm_source=ig_web_button_share_sheet'
+      ),
+      'https://www.instagram.com/reel/AbCdEf/'
+    );
+  });
+
+  test('strips TikTok-style _r/_t parameters from Instagram reels', () => {
+    assert.equal(
+      normalizeMediaUrl('https://www.instagram.com/reel/AbCdEf/?_r=1&_t=tracking'),
+      'https://www.instagram.com/reel/AbCdEf/'
+    );
+  });
+
+  test('strips share parameters from X/Twitter status URLs with a trailing slash', () => {
+    assert.equal(
+      normalizeMediaUrl('https://twitter.com/someuser/status/1234567890/?s=20'),
+      'https://twitter.com/someuser/status/1234567890/'
+    );
+  });
+
+  test('does not strip private-video hashes from Vimeo URLs', () => {
+    const url = 'https://vimeo.com/123456?h=privatehash';
+    assert.equal(normalizeMediaUrl(url), url);
+  });
+
   test('does not modify unrelated URLs', () => {
     const url = 'https://youtu.be/abc?si=tracking';
     assert.equal(normalizeMediaUrl(url), url);
@@ -130,9 +172,25 @@ describe('backgrounded run detection', () => {
     );
   });
 
+  test('detects an interactive-shell background job via its process group', () => {
+    // Interactive bash keeps stdin on the terminal for "&" jobs; ps then
+    // reports a STAT column without the "+" foreground marker.
+    assert.equal(
+      detectBackgroundedRun({ stdinTTY: true, stdoutTTY: true, stderrTTY: true, statLine: 'Ss' }),
+      true
+    );
+  });
+
   test('does not flag a normal interactive terminal', () => {
     assert.equal(
-      detectBackgroundedRun({ stdinTTY: true, stdoutTTY: true, stderrTTY: true }),
+      detectBackgroundedRun({ stdinTTY: true, stdoutTTY: true, stderrTTY: true, statLine: 'Ss+' }),
+      false
+    );
+  });
+
+  test('assumes foreground when the ps STAT line is unavailable', () => {
+    assert.equal(
+      detectBackgroundedRun({ stdinTTY: true, stdoutTTY: true, stderrTTY: true, statLine: '' }),
       false
     );
   });

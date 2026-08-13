@@ -1,4 +1,5 @@
 import { spawnYtDlp } from './ytdlp.js';
+import { isAntiBotChallenge } from './extract.js';
 import cliProgress from 'cli-progress';
 import path from 'path';
 import { notifyDone } from './notify.js';
@@ -189,6 +190,29 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
   } catch (err) {
     clearInterval(preparationTimer);
     bar.stop();
+    // TikTok-style anti-bot challenges can also hit the download phase; give
+    // the challenge a few seconds to clear and retry once before giving up.
+    // (Same predicate as extraction, so the two can't drift apart.)
+    if (!opts.retriedAntiBot && isAntiBotChallenge({ stderr: stderrBuffer })) {
+      console.log('\nThe site returned an unexpected or anti-bot response — retrying in 3s...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return downloadVideo(url, formatId, outputDir, { ...opts, retriedAntiBot: true });
+    }
+    // Sites with combined-only streams (e.g. TikTok) can't satisfy the
+    // video-only selectors that --quality presets expand to (they always
+    // carry a [height<=...] constraint). Fall back once to the best available
+    // format. Only preset-derived selectors (marked fromPreset by the caller)
+    // are ever overridden — explicit -f ids and picker choices never are.
+    if (
+      !opts.retriedBest &&
+      opts.fromPreset &&
+      /Requested format is not available/i.test(stderrBuffer)
+    ) {
+      console.log(
+        '\nThat format is not available on this site — retrying with the best available format...'
+      );
+      return downloadVideo(url, 'best', outputDir, { ...opts, retriedBest: true });
+    }
     const hint = /(?:timed? out|timeout)/i.test(stderrBuffer)
       ? '\n(The site connection timed out. Check your network, use a system-wide VPN, or pass --proxy <url> if the site is blocked.)'
       : /\[TikTok\].*(?:Unexpected response|universal data)/i.test(stderrBuffer)

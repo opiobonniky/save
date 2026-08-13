@@ -4,6 +4,7 @@ import {
   explainExtractionError,
   extractionSiteName,
   getExtractOptions,
+  isAntiBotChallenge,
   isRetryableExtractionError,
   normalizeFormats,
 } from '../src/extract.js';
@@ -43,6 +44,16 @@ test('retries transient extraction failures but not permanent errors', () => {
   assert.equal(isRetryableExtractionError({ stderr: 'Unable to extract universal data for rehydration' }), true);
   assert.equal(isRetryableExtractionError({ stderr: 'HTTP Error 429: Too Many Requests' }), true);
   assert.equal(isRetryableExtractionError({ stderr: 'This video is private' }), false);
+});
+
+test('classifies anti-bot challenges for longer retries', () => {
+  assert.equal(isAntiBotChallenge({ stderr: 'Unable to extract universal data for rehydration' }), true);
+  assert.equal(
+    isAntiBotChallenge({ stderr: 'ERROR: [TikTok] 123: Unexpected response from webpage request' }),
+    true
+  );
+  assert.equal(isAntiBotChallenge({ stderr: 'HTTP Error 429: Too Many Requests' }), false);
+  assert.equal(isAntiBotChallenge({ stderr: 'This video is private' }), false);
 });
 
 describe('explainExtractionError', () => {

@@ -45,9 +45,16 @@ export function getExtractOptions(options = {}) {
   };
 }
 
+const ANTI_BOT_CHALLENGE_RE = /unable to extract universal data|unexpected response/i;
+
 export function isRetryableExtractionError(error) {
   const detail = `${error?.stderr || ''}\n${error?.message || ''}`;
-  return /unable to extract universal data|unexpected response|timed? out|connection reset|HTTP Error (?:429|5\d\d)/i.test(detail);
+  return ANTI_BOT_CHALLENGE_RE.test(detail) || /timed? out|connection reset|HTTP Error (?:429|5\d\d)/i.test(detail);
+}
+
+/** True when a site (e.g. TikTok) served an anti-bot challenge instead of the page. */
+export function isAntiBotChallenge(error) {
+  return ANTI_BOT_CHALLENGE_RE.test(`${error?.stderr || ''}\n${error?.message || ''}`);
 }
 
 const EXTRACTION_ERROR_HINTS = [
@@ -113,14 +120,25 @@ export function extractionSiteName(error) {
 export async function extractFormats(url, options = {}) {
   let info;
   let lastError;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     try {
       info = await youtubedl(url, getExtractOptions(options));
       break;
     } catch (err) {
       lastError = err;
-      if (attempt === 2 || !isRetryableExtractionError(err)) break;
-      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+      if (!isRetryableExtractionError(err)) break;
+      const antiBot = isAntiBotChallenge(err);
+      // Anti-bot challenges (TikTok) are rate-based and can take a few seconds
+      // to clear, so retry more times with a longer backoff. Other transient
+      // errors keep the original 3 attempts.
+      if (attempt >= (antiBot ? 4 : 2)) break;
+      const backoffMs = (antiBot ? 1500 : 500) * (attempt + 1);
+      if (antiBot) {
+        console.error(
+          `The site returned an unexpected or anti-bot response — retrying in ${Math.ceil(backoffMs / 1000)}s...`
+        );
+      }
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
     }
   }
   if (!info && lastError) {

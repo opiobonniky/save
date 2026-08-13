@@ -11,11 +11,17 @@ which does the actual site-specific extraction work.
 - **Playlists.** Paste a playlist URL and choose to download the whole thing
   or pick specific videos from an interactive checklist.
 - **Batch mode.** `save --batch urls.txt` downloads every URL in a
-  text file (one per line, `#` for comments), with bounded `--jobs` concurrency.
+  text file (one per line, `#` for comments; blank lines are skipped), with
+  bounded `--jobs` concurrency.
+  Because URLs come from a file, the shell never parses them — a reliable
+  workaround when unquoted URLs with `&` keep getting split (see the
+  "Unquoted URLs" section under Usage).
 - **Interactive by default.** Single-video links open the format picker unless
   `--quality`, `--format`, or `--audio` selects a non-interactive mode.
 - **Quality presets.** Skip the picker with a preset from 360p through 2160p,
-  or use unlimited `best` through `--quality`.
+  or use unlimited `best` through `--quality`. On sites that only offer
+  combined video+audio streams (e.g. TikTok), a preset automatically falls
+  back to the best available format.
 - **Friendly format picker.** A simple menu shows one row per quality — `720p |
   mp4 | 5.8MB`, `576p | mp4 | 4.9MB` — with a **Best quality (recommended)**
   option on top and an **Audio only (MP3)** conversion at the bottom. Cryptic
@@ -131,8 +137,9 @@ Deno too. `aria2` remains optional.
 
 ### From a local checkout
 
-Running `npm install` only installs development dependencies. Use either the
-installer or npm's global install command to register `save` on `PATH`:
+Running `npm install` installs the package's dependencies but does not put
+the `save` command on `PATH`. Use either the installer or npm's global
+install command to register it:
 
 ```bash
 git clone https://github.com/opiobonniky/save.git
@@ -159,7 +166,7 @@ Build and install the self-contained Debian package with apt:
 npm install
 npm run build:standalone
 bash scripts/build-deb.sh
-sudo apt install ./dist/save_1.1.7-1_amd64.deb
+sudo apt install ./dist/save_<version>-1_amd64.deb
 ```
 
 The `.deb` is the same dependency-free application as the standalone archive: it
@@ -221,7 +228,8 @@ System media tools are left installed because other applications may use them.
   instead of the video page, which yt-dlp reports as *"Unexpected response from
   webpage request"* or *"Unable to extract universal data for rehydration"*.
   `save` sends a current Chrome User-Agent by default (the widely-confirmed
-  workaround; override with `--user-agent`), but failures can still be
+  workaround; override with `--user-agent`) and retries the challenge
+  automatically with backoff (up to 5 attempts), but failures can still be
   intermittent — retry, use a different network or `--proxy`, and consider
   browser cookies if it persists.
 - **Bot/WAF-protected sites (e.g. IMDb, some news sites).** Some sites sit behind
@@ -248,8 +256,58 @@ System media tools are left installed because other applications may use them.
 
 Quote URLs in the terminal. This is required for URLs containing characters
 such as `?` or `&`, which shells such as zsh otherwise interpret themselves.
-An unquoted `&` makes Bash run the downloader in the background, producing a
-`[1] <pid>` message and treating anything after it as a separate command.
+
+### Unquoted URLs: the `[1] <pid>` message
+
+Forgetting the quotes on a URL that contains `&` splits the command at the
+shell level, before `save` ever starts:
+
+- The `&` tells the shell to run the command in the background — that's the
+  `[1] <pid>` message (job number and process id).
+- Everything after the `&` is treated as a separate command, which usually
+  fails with `command not found`.
+
+`save` cannot recover the part the shell cut off — it never receives it. It
+does, however, detect what happened and reacts:
+
+1. **Aborts when it would have prompted.** A backgrounded run has no usable
+   interactive terminal, so when the command would have shown the format or
+   playlist picker, `save` stops by default and prints a ready-to-paste
+   command with the URL it received quoted. It detects the split either from
+   the redirected stdin (scripts, cron, CI) or from the process group when an
+   interactive shell backgrounds the job. A deliberate `save <url> &` is
+   indistinguishable from an accidental split and is treated the same way —
+   use `--continue-background` or an explicit selection to background on
+   purpose. Pass `--continue-background` to download anyway (best quality, no
+   picker, and playlists download in full without prompting). Commands with an
+   explicit selection (`--quality`, `--format`, `--audio`) don't need a picker
+   and continue after the warning.
+
+   Note: Windows (`cmd`/PowerShell) truncates at an unquoted `&` without any
+   of these signals, so quoting is essential there.
+2. **Strips tracking parameters** on sites where the media ID lives in the URL
+   path — TikTok, YouTube Shorts, Instagram reels/posts, and X/Twitter
+   statuses — so even a split URL still points at the right video.
+3. **Warns** when the URL it did receive looks cut off (a trailing `?`, `&`,
+   or empty `key=`).
+
+On your side, the reliable fixes are:
+
+```bash
+# Quote the whole URL (double or single quotes)
+save "https://www.tiktok.com/@user/video/123?is_from_webapp=1&sender_device=pc"
+
+# On TikTok, Shorts, Reels, and X the video ID is in the path, so the tracking
+# query string is optional — and without it, no quoting is needed:
+save https://www.tiktok.com/@user/video/123
+
+# Batch mode: URLs live in a text file (one per line, # for comments), so the
+# shell never parses them — no quoting needed at all:
+save --batch urls.txt
+
+# zsh: make quoting unnecessary with an alias (bash has no equivalent)
+alias save='noglob save'
+```
 
 ```bash
 # Open the interactive format picker
@@ -318,26 +376,71 @@ when `terminal-notifier` is installed. macOS falls back to a non-clickable
 `osascript` notification. Headless systems silently skip notifications, and
 the notification listener never blocks the CLI.
 
+### Batch files
+
+`--batch` reads URLs from a plain text file — one URL per line. Blank lines
+and lines starting with `#` are ignored, surrounding whitespace is trimmed,
+and URLs are never parsed by the shell, so no quoting is needed even when
+they contain `&` or `?`.
+
+Example `urls.txt`:
+
+```
+# One URL per line; # starts a comment
+https://www.tiktok.com/@user/video/123?is_from_webapp=1&sender_device=pc
+https://youtube.com/shorts/abc123?si=tracking
+
+# Blank lines are fine too; playlists and mixed sites work
+https://www.instagram.com/reel/AbCdEf/
+https://youtube.com/playlist?list=PLxyz
+```
+
+Download them all, optionally with `--jobs` concurrency:
+
+```bash
+save --batch urls.txt ~/Videos --jobs 2
+```
+
 ## Project structure
 
 ```
 save/
 ├── bin/
-│   └── save.js             # CLI entry point (argument parsing, orchestration)
-├── src/
-│   ├── extract.js           # fetches available formats for a URL via yt-dlp
-│   ├── prompt.js              # interactive format picker (inquirer)
-│   ├── download.js             # runs the download, renders progress bar
-│   ├── formatUtils.js           # shared format display/merge-detection helpers
-│   └── checkDeps.js               # runtime safety-net dependency check
+│   └── save.js                  # CLI entry point: arg parsing, orchestration, config/doctor subcommands
+├── src/                         # core modules (ES modules)
+│   ├── options.js               # flag validation, quality presets, URL classification
+│   ├── extract.js               # fetches available formats for a URL via yt-dlp
+│   ├── formatUtils.js           # format display/merge-detection helpers, picker choices
+│   ├── prompt.js                # interactive format picker (inquirer)
+│   ├── download.js              # runs the download, renders progress bar
+│   ├── progress.js              # parses yt-dlp/aria2c progress output
+│   ├── batch.js                 # batch-file parsing and bounded worker pool
+│   ├── config.js                # saved defaults (outputDir, quality, connections, subLangs)
+│   ├── notify.js                # desktop notification when a download finishes
+│   ├── ytdlp.js                 # low-level exec/spawn of yt-dlp
+│   ├── ffmpeg.js                # resolves the ffmpeg/ffprobe location
+│   ├── executables.js           # finds bundled/managed/system tool binaries
+│   ├── managedYtDlp.js          # downloads & checksums a cached yt-dlp binary
+│   ├── managedFfmpeg.js         # downloads & checksums a cached ffmpeg binary
+│   ├── runtime.js               # JS-runtime detection, default Chrome user-agent
+│   ├── checkDeps.js             # runtime safety-net dependency check
+│   ├── toolVersions.js          # pinned yt-dlp/ffmpeg/Deno versions
+│   ├── standaloneChecksum.js    # release-checksum parsing used by the standalone builder
+│   └── version.js               # CLI version (kept in sync with package.json)
 ├── scripts/
 │   ├── build-standalone.mjs     # builds the dependency-free archive (pkg + bundled tools)
-│   └── build-deb.sh             # builds the self-contained .deb from the archive
-├── dist/
-│   ├── save-<version>-linux-x64/   # dependency-free app: save + libexec/{yt-dlp,ffmpeg,ffprobe,deno}
-│   └── save_<version>_amd64.deb    # self-contained Debian package (after npm run build:standalone + build-deb.sh)
-├── install.sh                  # installs via npm (machine already has Node.js)
-├── install-standalone.sh         # installs the bundled binary (no Node.js needed)
+│   ├── build-deb.sh             # builds the self-contained .deb from the archive
+│   └── install-deps.sh          # optional Linux system dependency setup
+├── test/                        # node --test unit tests for the pure-logic modules
+├── packaging/
+│   └── deb/                     # Debian package metadata consumed by scripts/build-deb.sh
+├── dist/                        # build output (generated, not committed)
+│   ├── save-<version>-linux-x64/    # dependency-free app: save + libexec/{yt-dlp,ffmpeg,ffprobe,deno}
+│   └── save_<version>-1_amd64.deb  # self-contained Debian package (after npm run build:standalone + build-deb.sh)
+├── .github/workflows/ci.yml     # runs tests on push, builds release artifacts on tags
+├── install.sh                   # installs via npm (machine already has Node.js)
+├── install-standalone.sh        # installs the bundled binary (no Node.js needed)
+├── uninstall.sh                 # removes the standalone installation
 ├── package.json
 └── README.md
 ```

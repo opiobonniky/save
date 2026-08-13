@@ -15,6 +15,7 @@ import {
   getDefaultDownloadsDir,
   isLikelyPlaylistUrl,
   looksShellTruncated,
+  normalizeMediaUrl,
   parseCount,
   parseProxy,
   resolveMediaUrl,
@@ -55,11 +56,14 @@ program
   .option('-j, --jobs <count>', 'simultaneous batch downloads, 1-4', '1')
   .option('--timing', 'print preflight, startup, transfer, processing, and total times')
   .option('--playlist', 'force playlist detection and interactive item selection')
-  .option('--batch <file>', 'read URLs from a text file; blank lines and # comments are ignored')
+  .option('--batch <file>', 'read URLs from a text file, bypassing shell parsing of & and ?; blank lines and # comments are ignored')
+  .option('--continue-background', 'proceed with an unquoted-URL background run instead of aborting')
   .action(async (url, outputDir, options) => {
     try {
       if (options.batch) {
-        await runBatch(options.batch, outputDir, options);
+        // In batch mode there is no URL positional, so the first positional
+        // (`url`) is the output directory: save --batch urls.txt ~/Videos
+        await runBatch(options.batch, outputDir || url, options);
       } else {
         if (!url) {
           console.error(chalk.red('Error: a URL is required (or use --batch <file>).'));
@@ -100,6 +104,8 @@ Useful commands:
 
 Notes:
   Always quote URLs containing ? or &; otherwise the shell may split or background the command.
+  A backgrounded command aborts by default; pass --continue-background to proceed (best quality).
+  Or put URLs in a text file and use --batch — file contents are never parsed by the shell.
   --quality best may download very large 1440p or 4K files.
   Use --aria2 only when native downloading does not fill your connection.
   Respect site terms and content rights.`);
@@ -191,6 +197,14 @@ program
       console.log('Install Deno 2.3+ (recommended) or use Node.js 22+.');
       process.exitCode = 1;
     }
+    if (detectBackgroundedRun()) {
+      console.log(
+        chalk.yellow(
+          '\nNote: this command is running in the background (e.g. split by an unquoted "&" URL).\n' +
+            'Downloads abort by default; re-run with the URL quoted, or pass --continue-background to proceed.'
+        )
+      );
+    }
   })
   .addHelpText('after', `
 Checks:
@@ -198,6 +212,10 @@ Checks:
   ffmpeg       Video/audio merging, MP3, and subtitle conversion
   aria2c       Optional direct-file acceleration
   Deno/Node    YouTube JavaScript challenge support
+
+Tip:
+  Ran in the background by an unquoted & URL? Re-run with the URL quoted, or
+  pass --continue-background to proceed with the download.
 
 Deno 2.3+ is the recommended YouTube JavaScript runtime.`);
 
@@ -226,7 +244,11 @@ function ensureOutputDir(outputDir) {
 }
 
 async function run(url, outputDirArg, options) {
-  const backgrounded = detectBackgroundedRun();
+  const backgrounded = detectBackgroundedRun({ batchMode: options.batchMode });
+  // Downstream code must not trust process.stdin.isTTY for backgrounded runs:
+  // interactive shells keep the terminal attached, so a backgrounded save
+  // would otherwise show the picker and hang waiting for input nobody can give.
+  options.backgrounded = backgrounded;
   if (backgrounded) {
     console.error(
       chalk.red.bold(
@@ -235,9 +257,35 @@ async function run(url, outputDirArg, options) {
           'A backgrounded save cannot ask you to choose a format.\n'
       ) +
         chalk.yellow(
-          `To run it in the foreground instead, quote the URL:\n  save "${url}"\n`
-        ) +
-        chalk.gray('Continuing this background run automatically with best available quality.\n')
+          'To run it in the foreground instead, paste this:\n' +
+            `  save "${normalizeMediaUrl(url)}"\n` +
+            '(this is the URL save received — anything after the "&" was already cut\n' +
+            ' off by the shell, so use your full URL if a parameter there mattered)\n'
+        )
+    );
+    // Only abort when this command would have needed the interactive picker.
+    // Explicit selections (--quality/--format/--audio) produce the same result
+    // in the background, so for those a warning is enough (and scripted runs
+    // with a redirected stdin, e.g. save <url> --quality 720p < /dev/null,
+    // look "backgrounded" by the TTY heuristic without being one).
+    const wouldPrompt =
+      options.choose ||
+      isLikelyPlaylistUrl(url) ||
+      (!options.audio && !options.format && !options.quality && !options.listFormats);
+    if (wouldPrompt && !options.continueBackground) {
+      console.error(
+        chalk.gray(
+          'Aborted. Re-run with the URL quoted, or pass --continue-background to download anyway (best quality, no picker).\n'
+        )
+      );
+      process.exit(1);
+    }
+    console.error(
+      chalk.gray(
+        'Continuing this background run automatically with best available quality.\n' +
+          'Note: if your URL contained an unquoted "&", anything after it was cut off\n' +
+          ' and never reached save — paste the full URL quoted to include it.\n'
+      )
     );
   }
   url = await resolveMediaUrl(url);
@@ -293,6 +341,7 @@ async function run(url, outputDirArg, options) {
     console.log(chalk.gray(`Saving to: ${outputDir}`));
     await downloadVideo(url, options.audio ? 'bestaudio' : qualitySelector, outputDir, {
       ...downloadOpts,
+      fromPreset: !options.audio && !!qualitySelector,
       noPlaylist: true,
     });
     return;
@@ -328,16 +377,24 @@ async function run(url, outputDirArg, options) {
   }
 
   let formatId = options.format;
+  let fromPreset = false;
   if (!formatId) {
     if (options.choose || !quality) {
-      if (process.stdin.isTTY) {
+      if (process.stdin.isTTY && !options.backgrounded) {
         formatId = await pickFormat(formats);
       } else {
         formatId = 'bestvideo+bestaudio/best';
-        console.log(chalk.gray('Non-interactive terminal: using best available quality.'));
+        console.log(
+          chalk.gray(
+            options.backgrounded
+              ? 'Backgrounded run: using best available quality (no picker in the background).'
+              : 'Non-interactive terminal: using best available quality.'
+          )
+        );
       }
     } else {
       formatId = qualitySelector;
+      fromPreset = true;
       console.log(chalk.gray(`Using ${quality} quality.`));
     }
   }
@@ -363,7 +420,7 @@ async function run(url, outputDirArg, options) {
   }
 
   console.log(chalk.gray(`Saving to: ${outputDir}`));
-  await downloadVideo(url, formatId, outputDir, downloadOpts);
+  await downloadVideo(url, formatId, outputDir, { ...downloadOpts, fromPreset });
 }
 
 async function handlePlaylist(url, result, outputDir, options) {
@@ -371,9 +428,11 @@ async function handlePlaylist(url, result, outputDir, options) {
 
   checkDependencies({ requireFfmpeg: true }); // playlist downloads merge video+audio by default
 
-  // Batch/non-interactive mode: don't block on a prompt — just grab the whole playlist.
-  if (options.batchMode || !process.stdin.isTTY) {
+  // Batch, backgrounded, or non-interactive mode: don't block on a prompt —
+  // just grab the whole playlist.
+  if (options.batchMode || options.backgrounded || !process.stdin.isTTY) {
     if (options.batchMode) console.log(chalk.gray('Batch mode: downloading entire playlist automatically.'));
+    else if (options.backgrounded) console.log(chalk.gray('Backgrounded run: downloading the entire playlist automatically.'));
     else console.log(chalk.gray('Non-interactive terminal: downloading the entire playlist automatically.'));
     console.log(chalk.gray(`Saving to: ${outputDir}`));
     await downloadPlaylist(url, outputDir, getPlaylistOptions(options));

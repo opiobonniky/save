@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Ensures yt-dlp and ffmpeg are installed, auto-installing them via
-# whichever package manager is available. Used by:
-#   - install-standalone.sh (when installed via the bundled binary, no Node needed)
-#   - Debian/standalone build environments that need system executables
+# whichever package manager is available. Invoked manually by developers
+# (npm run setup:linux) when they want system-provided yt-dlp/ffmpeg
+# instead of the managed binaries the CLI downloads on first use.
 set -u
 
 GREEN='\033[0;32m'

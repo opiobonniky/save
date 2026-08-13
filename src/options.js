@@ -1,5 +1,6 @@
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
 
 export const QUALITY_SELECTORS = {
   best: 'bestvideo+bestaudio/best',
@@ -54,13 +55,48 @@ export function isLikelyPlaylistUrl(value) {
   }
 }
 
+// Sites where the media ID lives in the URL path and the query string carries
+// only share/tracking parameters. Stripping those makes the URL safe to paste
+// unquoted: even if the shell cuts it at an unquoted "&", nothing meaningful
+// is lost and the video still resolves. Vimeo is deliberately absent — its
+// query can carry private-video hashes (?h=...) that must be preserved.
+const QUERY_STRIP_RULES = [
+  {
+    hostname: /(^|\.)tiktok\.com$/i,
+    path: /\/@[^/]+\/(?:video|photo)\/\d+\/?$/i,
+    stripAll: true, // every TikTok query param is tracking; the video ID is in the path
+    rewritePath: p => p.replace('/photo/', '/video/'), // photo posts need the extractor-supported video route
+  },
+  {
+    hostname: /(^|\.)youtube\.com$/i,
+    path: /\/shorts\/[^/]+\/?$/i,
+    stripParams: /^(?:si|feature|utm_\w+)$/i, // share buttons add these; keep t=, list=, etc.
+  },
+  {
+    hostname: /(^|\.)instagram\.com$/i,
+    path: /\/(?:reel|p|tv)\/[^/]+\/?$/i,
+    stripParams: /^(?:igsh|_r|_t|utm_\w+)$/i, // _r/_t are the same share tracking TikTok uses
+  },
+  {
+    hostname: /(^|\.)(?:twitter|x)\.com$/i,
+    path: /\/[^/]+\/status\/\d+\/?$/i, // s= is X's share indicator (s=20)
+    stripParams: /^(?:s|utm_\w+)$/i,
+  },
+];
+
 export function normalizeMediaUrl(value) {
   try {
     const url = new URL(value);
-    if (/(^|\.)tiktok\.com$/i.test(url.hostname) && /\/@[^/]+\/(?:video|photo)\/\d+\/?$/i.test(url.pathname)) {
-      url.pathname = url.pathname.replace('/photo/', '/video/');
-      url.search = '';
-      url.hash = '';
+    for (const rule of QUERY_STRIP_RULES) {
+      if (!rule.hostname.test(url.hostname) || !rule.path.test(url.pathname)) continue;
+      if (rule.rewritePath) url.pathname = rule.rewritePath(url.pathname);
+      if (rule.stripAll) {
+        url.search = '';
+        url.hash = '';
+      } else {
+        const kept = [...url.searchParams.entries()].filter(([name]) => !rule.stripParams.test(name));
+        url.search = kept.length ? `?${new URLSearchParams(kept).toString()}` : '';
+      }
       return url.toString();
     }
   } catch {
@@ -85,11 +121,45 @@ export function detectBackgroundedRun({
   stdoutTTY,
   stderrTTY,
   batchMode = false,
+  statLine, // injectable for tests: ps -o stat= output for this process
 } = {}) {
   const stdinInteractive = stdinTTY ?? !!process.stdin.isTTY;
   const stdoutInteractive = stdoutTTY ?? !!process.stdout.isTTY;
   const stderrInteractive = stderrTTY ?? !!process.stderr.isTTY;
-  return !batchMode && !stdinInteractive && (stdoutInteractive || stderrInteractive);
+  if (batchMode) return false;
+
+  // Classic signature: stdin was redirected. POSIX shells point an "&" job's
+  // stdin at /dev/null (scripts, cron, CI); the same shape comes from an
+  // explicit < /dev/null.
+  if (!stdinInteractive && (stdoutInteractive || stderrInteractive)) return true;
+
+  // No terminal at all (piped output, CI) — nothing to warn about.
+  if (!stdoutInteractive && !stderrInteractive) return false;
+
+  // Interactive shells (bash job control) keep the terminal on a background
+  // job's stdin, so fall back to the process group to catch those splits: ps
+  // marks the foreground process group's STAT column with a trailing "+".
+  return !isForegroundProcessGroup(statLine);
+}
+
+/**
+ * True when this process is in the terminal's foreground process group, or
+ * when we cannot tell (ps missing/empty) — assume foreground rather than
+ * block legitimate runs.
+ */
+function isForegroundProcessGroup(statLine) {
+  if (statLine === undefined) {
+    try {
+      statLine = execFileSync('ps', ['-o', 'stat=', '-p', String(process.pid)], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch {
+      return true; // ps unavailable — assume foreground rather than block legitimate runs
+    }
+  }
+  const stat = String(statLine).trim();
+  return stat.length === 0 || stat.endsWith('+');
 }
 
 export function getDefaultDownloadsDir({
