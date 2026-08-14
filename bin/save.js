@@ -23,6 +23,7 @@ import {
   resolveMediaUrl,
   resolveQualitySelector,
 } from '../src/options.js';
+import { StatusBar, prettySiteName } from '../src/status.js';
 import { getRuntimeDiagnostics } from '../src/runtime.js';
 import { parseBatchLines, runWorkerPool } from '../src/batch.js';
 import { VERSION } from '../src/version.js';
@@ -349,8 +350,38 @@ async function run(url, outputDirArg, options) {
     return;
   }
 
-  console.log(chalk.blue('Fetching video information...'));
-  const result = await extractFormats(url, { proxy, flatPlaylist: likelyPlaylist, userAgent, cookiesFromBrowser });
+  const fetchBar = new StatusBar({ noProgress: options.noProgress });
+  if (!fetchBar.enabled) {
+    console.log(chalk.blue('Fetching video information...'));
+  }
+  const onExtractStatus = (event) => {
+    if (!fetchBar.enabled) return;
+    const subject = prettySiteName(event.site);
+    if (event.attempt === 1) {
+      fetchBar.start(`Fetching video info from ${subject}…`);
+      return;
+    }
+    if (event.backoffMs) {
+      const antiBot = event.antiBot ? 'Anti-bot check — ' : '';
+      fetchBar.update(
+        `${antiBot}${subject} ${event.reason} — retry ${event.attempt}/${event.total} in ${Math.ceil(event.backoffMs / 1000)}s`
+      );
+      return;
+    }
+    fetchBar.update(`${subject} ${event.reason} — retrying (attempt ${event.attempt}/${event.total})`);
+  };
+  let result;
+  try {
+    result = await extractFormats(url, {
+      proxy,
+      flatPlaylist: likelyPlaylist,
+      userAgent,
+      cookiesFromBrowser,
+      onStatus: onExtractStatus,
+    });
+  } finally {
+    fetchBar.clear();
+  }
   downloadOpts.preflightSeconds = (Date.now() - operationStartedAt) / 1000;
   console.log(chalk.green(`Found: ${result.title}`));
 

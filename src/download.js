@@ -1,5 +1,6 @@
 import { spawnYtDlp } from './ytdlp.js';
-import { getAntiBotBackoffMs, isAntiBotChallenge } from './extract.js';
+import { getAntiBotBackoffMs, isAntiBotChallenge, siteNameFromUrl } from './extract.js';
+import { prettySiteName } from './status.js';
 import cliProgress from 'cli-progress';
 import path from 'path';
 import { notifyDone } from './notify.js';
@@ -77,7 +78,8 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
   const preparationStartedAt = Date.now();
   const spinnerFrames = ['-', '\\', '|', '/'];
   let spinnerIndex = 0;
-  let preparationPhase = 'Starting downloader';
+  const subject = prettySiteName(siteNameFromUrl(url));
+  let preparationPhase = `Starting download from ${subject}`;
   let progressStarted = false;
 
   bar.start(100, 0, { speed: 'waiting', status: `- ${preparationPhase} (0s)` });
@@ -143,13 +145,13 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
   let sawResuming = false;
 
   const updatePhase = (line) => {
-    if (/Downloading \d+ format/i.test(line)) preparationPhase = 'Preparing media';
-    if (/Destination:/i.test(line)) preparationPhase = 'Opening output file';
-    if (/temporary cookies file/i.test(line)) preparationPhase = 'Starting aria2c';
+    if (/Downloading \d+ format/i.test(line)) preparationPhase = 'Resolving media streams';
+    if (/Destination:/i.test(line)) preparationPhase = 'Creating the output file';
+    if (/temporary cookies file/i.test(line)) preparationPhase = 'Launching aria2c';
     if (/\[(?:Merger|ExtractAudio)\]/i.test(line)) {
       progressStarted = true;
       processingStartedAt ||= Date.now();
-      bar.update(bar.value, { status: 'Processing final file' });
+      bar.update(bar.value, { status: 'Processing the final file' });
     }
   };
 
@@ -203,6 +205,8 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     const antiBotAttempt = opts.antiBotAttempt || 0;
     const antiBotBackoffMs = getAntiBotBackoffMs(antiBotAttempt);
     if (antiBotBackoffMs !== null && isAntiBotChallenge({ stderr: stderrBuffer })) {
+      const waitSeconds = Math.ceil(antiBotBackoffMs / 1000);
+      console.log(`\n${subject} is running an anti-bot check — waiting ${waitSeconds}s before trying again.`);
       await new Promise(resolve => setTimeout(resolve, antiBotBackoffMs));
       return downloadVideo(url, formatId, outputDir, {
         ...opts,
@@ -212,6 +216,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     }
     const forbiddenFallback = getForbiddenFallbackFormat(formatId, stderrBuffer, opts);
     if (forbiddenFallback) {
+      console.log('\nThe site blocked the media stream (HTTP 403) — switching to an alternate stream.');
       return downloadVideo(url, forbiddenFallback, outputDir, {
         ...opts,
         startedAt,
@@ -229,6 +234,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
       opts.fromPreset &&
       /Requested format is not available/i.test(stderrBuffer)
     ) {
+      console.log("\nThat quality isn't available here — using the best available format instead.");
       return downloadVideo(url, 'best', outputDir, { ...opts, startedAt, retriedBest: true });
     }
     const hint = /(?:timed? out|timeout)/i.test(stderrBuffer)

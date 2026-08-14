@@ -52,6 +52,47 @@ export function isRetryableExtractionError(error) {
   return ANTI_BOT_CHALLENGE_RE.test(detail) || /timed? out|connection reset|HTTP Error (?:429|5\d\d)/i.test(detail);
 }
 
+const SITE_HOSTS = {
+  youtube: ['youtube.com', 'youtu.be', 'music.youtube.com'],
+  tiktok: ['tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com'],
+  instagram: ['instagram.com'],
+  facebook: ['facebook.com', 'fb.watch'],
+  twitter: ['twitter.com', 'x.com'],
+  vimeo: ['vimeo.com'],
+  twitch: ['twitch.tv'],
+  reddit: ['reddit.com', 'redd.it'],
+  soundcloud: ['soundcloud.com'],
+  pinterest: ['pinterest.com'],
+  bilibili: ['bilibili.com', 'b23.tv'],
+  dailymotion: ['dailymotion.com'],
+};
+
+/** A site id guessed from the URL hostname, e.g. "youtube" or "tiktok". */
+export function siteNameFromUrl(url) {
+  let host;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+  for (const [name, hosts] of Object.entries(SITE_HOSTS)) {
+    if (hosts.some(match => host === match || host.endsWith(`.${match}`))) return name;
+  }
+  return host.split('.')[0] || host;
+}
+
+/** A short phrase describing why a retry is happening, e.g. "is rate-limiting requests". */
+export function retryReason(error) {
+  const detail = `${error?.stderr || ''}\n${error?.message || ''}`;
+  if (isAntiBotChallenge(error)) return "is checking to make sure we're not a bot";
+  if (/timed? out|ECONNRESET|ECONNREFUSED|ENOTFOUND|connection reset|failed to resolve|couldn't connect/i.test(detail)) {
+    return 'dropped the connection or timed out';
+  }
+  if (/HTTP Error 429|Too Many Requests/i.test(detail)) return 'is rate-limiting requests';
+  if (/HTTP Error 5\d\d|HTTP Error 5/i.test(detail)) return 'returned a temporary server error';
+  return 'hit a temporary glitch';
+}
+
 /** True when a site (e.g. TikTok) served an anti-bot challenge instead of the page. */
 export function isAntiBotChallenge(error) {
   return ANTI_BOT_CHALLENGE_RE.test(`${error?.stderr || ''}\n${error?.message || ''}`);
@@ -126,25 +167,30 @@ export function extractionSiteName(error) {
  * or let the user pick specific videos from it.
  */
 export async function extractFormats(url, options = {}) {
+  const onStatus = options.onStatus || (() => {});
+  const run = options.runner || youtubedl;
+  const total = 6;
+  let site = siteNameFromUrl(url);
   let info;
   let lastError;
-  for (let attempt = 0; attempt < 6; attempt++) {
+  for (let attempt = 0; attempt < total; attempt++) {
+    onStatus({ type: 'attempt', attempt: attempt + 1, total, site });
     try {
-      info = await youtubedl(url, getExtractOptions(options, url));
+      info = await run(url, getExtractOptions(options, url));
       break;
     } catch (err) {
       lastError = err;
       if (!isRetryableExtractionError(err)) break;
+      site = extractionSiteName(err) || site;
       const antiBot = isAntiBotChallenge(err);
-      // Anti-bot challenges (TikTok) are rate-based and can take a few seconds
-      // to clear, so retry more times with a longer backoff. Other transient
-      // errors keep the original 3 attempts.
+      const reason = retryReason(err);
       const backoffMs = antiBot
         ? getAntiBotBackoffMs(attempt)
         : attempt < 2
           ? 500 * (attempt + 1)
           : null;
       if (backoffMs === null) break;
+      onStatus({ type: 'waiting', attempt: attempt + 1, total, backoffMs, reason, site, antiBot });
       await new Promise(resolve => setTimeout(resolve, backoffMs));
     }
   }
