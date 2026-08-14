@@ -47,6 +47,7 @@ const packageDir = path.join(root, 'dist', artifactName);
 const libexecDir = path.join(packageDir, 'libexec');
 const cacheDir = path.join(root, 'dist', '.standalone-cache');
 const appPath = path.join(packageDir, `save${executableSuffix}`);
+const standaloneMarker = '@opiobonniky/save standalone\n';
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', ...options });
@@ -99,6 +100,7 @@ const pkgBin = path.join(root, 'node_modules', '@yao-pkg', 'pkg', 'lib-es5', 'bi
 const builtApp = path.join(root, 'dist', `save-${platformName}-${arch}${executableSuffix}`);
 run(process.execPath, [pkgBin, 'dist/save.cjs', '--targets', target.pkg, '--output', builtApp]);
 copyExecutable(builtApp, appPath);
+writeFileSync(path.join(packageDir, '.standalone-package'), standaloneMarker);
 if (platform === 'win32') {
   writeFileSync(path.join(packageDir, 'save.cmd'), '@echo off\r\n"%~dp0save.exe" %*\r\n');
 }

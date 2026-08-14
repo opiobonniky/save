@@ -4,7 +4,7 @@ Section: utils
 Priority: optional
 Architecture: amd64
 Recommends: aria2
-Maintainer: Bonny <bonny@example.com>
+Maintainer: Boniface <opiobonniky@users.noreply.github.com>
 Description: Download videos from YouTube, TikTok, Facebook, and more
  A terminal tool for downloading videos from YouTube, TikTok, Facebook,
  and hundreds of other sites, with an interactive format picker and

@@ -56,11 +56,20 @@ jobs:
         run: npm ci
       - name: Build dependency-free archive
         run: npm run build:standalone
+      - name: Build Debian package
+        if: runner.os == 'Linux'
+        run: bash scripts/build-deb.sh
+      - name: Build macOS installer package
+        if: runner.os == 'macOS'
+        run: bash scripts/build-macos-pkg.sh
       - name: Upload standalone archive
         uses: actions/upload-artifact@v5
         with:
           name: save-${{ matrix.artifact }}
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.deb
+            dist/*.pkg
           if-no-files-found: error
 
   release:
@@ -83,4 +92,7 @@ jobs:
       - name: Upload artifacts to the release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/*.zip
+          files: |
+            release-assets/*.zip
+            release-assets/*.deb
+            release-assets/*.pkg

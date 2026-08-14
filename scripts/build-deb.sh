@@ -18,14 +18,18 @@ if [ ! -d "$STANDALONE" ]; then
 fi
 
 rm -rf "$PKG_DIR"
-mkdir -p "$PKG_DIR/DEBIAN" "$PKG_DIR/usr/local/bin" "$PKG_DIR/usr/local/lib"
+mkdir -p "$PKG_DIR/DEBIAN" "$PKG_DIR/usr/bin" "$PKG_DIR/usr/lib"
+chmod 755 "$PKG_DIR" "$PKG_DIR/DEBIAN" "$PKG_DIR/usr" "$PKG_DIR/usr/bin" "$PKG_DIR/usr/lib"
 
-# App + private tools installed under /usr/local/lib/save; /usr/local/bin/save
+# App + private tools installed under /usr/lib/save; /usr/bin/save
 # is a symlink to it. The application resolves its libexec tools relative to
 # its own location, so the two directories must stay together.
-cp -a "$STANDALONE" "$PKG_DIR/usr/local/lib/save"
-chmod 755 "$PKG_DIR/usr/local/lib/save/save" "$PKG_DIR/usr/local/lib/save/libexec/"*
-ln -s ../lib/save/save "$PKG_DIR/usr/local/bin/save"
+cp -a "$STANDALONE" "$PKG_DIR/usr/lib/save"
+rm -f "$PKG_DIR/usr/lib/save/install.sh" "$PKG_DIR/usr/lib/save/uninstall.sh"
+find "$PKG_DIR/usr/lib/save" -type d -exec chmod 755 {} +
+find "$PKG_DIR/usr/lib/save" -type f -exec chmod 644 {} +
+chmod 755 "$PKG_DIR/usr/lib/save/save" "$PKG_DIR/usr/lib/save/libexec/"*
+ln -s ../lib/save/save "$PKG_DIR/usr/bin/save"
 
 cp -r packaging/deb/save/DEBIAN/* "$PKG_DIR/DEBIAN/"
 sed -i "s/^Version: .*/Version: ${PKG_VER}/" "$PKG_DIR/DEBIAN/control"

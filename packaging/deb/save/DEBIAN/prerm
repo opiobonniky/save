@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# Media dependencies may be shared with other applications.
-exit 0

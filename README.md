@@ -86,9 +86,10 @@ Download the archive for your computer from the
 | System | Archive |
 | --- | --- |
 | Linux x64 | `save-<version>-linux-x64.zip` |
+| Debian/Ubuntu x64 | `save_<version>-1_amd64.deb` |
 | Windows x64 | `save-<version>-windows-x64.zip` |
-| macOS Intel | `save-<version>-macos-x64.zip` |
-| macOS Apple silicon | `save-<version>-macos-arm64.zip` |
+| macOS Intel | `save-<version>-macos-x64.zip` or `.pkg` |
+| macOS Apple silicon | `save-<version>-macos-arm64.zip` or `.pkg` |
 
 The archive contains the app runtime, standalone yt-dlp, ffmpeg, ffprobe, and
 Deno. It does not need Node.js, Python, npm, yt-dlp, ffmpeg, Deno, sudo, or a
@@ -106,7 +107,15 @@ cd save-<version>-<platform>-<arch>
 
 The extracted archive also includes an optional `install.sh`, which copies the
 whole self-contained application under `/usr/local` and adds the `save`
-command to `PATH`.
+command to `PATH`:
+
+```bash
+bash install.sh
+```
+
+Do not prefix the whole command with `sudo`; the installer requests privileges
+only when needed. This also lets it replace an older npm/NVM `save` link that
+would otherwise appear earlier in your user `PATH`.
 
 On Windows, extract the ZIP and run these commands in PowerShell:
 
