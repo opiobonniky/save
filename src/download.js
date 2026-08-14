@@ -26,6 +26,12 @@ function createProgressBar(options, preset, disabled) {
   };
 }
 
+export function getForbiddenFallbackFormat(formatId, detail, opts = {}) {
+  const fallback = 'bestvideo+bestaudio/best';
+  if (opts.audio || opts.retriedForbidden || !/HTTP Error 403: Forbidden/i.test(detail)) return null;
+  return formatId === fallback ? null : fallback;
+}
+
 /**
  * Downloads the video at `url` using the given format id, saving it
  * into outputDir, with a live progress bar.
@@ -96,7 +102,7 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     fragmentRetries: 10,
     progressDelta: 0.25,
     proxy: opts.proxy,
-    ...getYtDlpRuntimeOptions(),
+    ...getYtDlpRuntimeOptions(url),
     ...getFfmpegOptions(),
   };
 
@@ -204,11 +210,20 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
         antiBotAttempt: antiBotAttempt + 1,
       });
     }
+    const forbiddenFallback = getForbiddenFallbackFormat(formatId, stderrBuffer, opts);
+    if (forbiddenFallback) {
+      return downloadVideo(url, forbiddenFallback, outputDir, {
+        ...opts,
+        startedAt,
+        retriedForbidden: true,
+      });
+    }
     // Sites with combined-only streams (e.g. TikTok) can't satisfy the
     // video-only selectors that --quality presets expand to (they always
     // carry a [height<=...] constraint). Fall back once to the best available
-    // format. Only preset-derived selectors (marked fromPreset by the caller)
-    // are ever overridden — explicit -f ids and picker choices never are.
+    // format. This unavailable-format fallback only changes preset-derived
+    // selectors; the separate HTTP 403 recovery above handles expired or
+    // blocked media URLs regardless of how the format was selected.
     if (
       !opts.retriedBest &&
       opts.fromPreset &&
@@ -299,7 +314,7 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     ignoreErrors: true, // one broken video in a playlist shouldn't abort the whole batch
     format: opts.audio ? AUDIO_FORMAT_SELECTOR : opts.format || 'bestvideo+bestaudio/best',
     concurrentFragments: opts.connections || 4,
-    ...getYtDlpRuntimeOptions(),
+    ...getYtDlpRuntimeOptions(url),
     ...getFfmpegOptions(),
   };
 

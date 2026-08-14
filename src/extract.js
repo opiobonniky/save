@@ -31,7 +31,7 @@ export function normalizeFormats(formats) {
     }));
 }
 
-export function getExtractOptions(options = {}) {
+export function getExtractOptions(options = {}, url) {
   return {
     dumpJson: !options.flatPlaylist,
     dumpSingleJson: options.flatPlaylist,
@@ -39,7 +39,7 @@ export function getExtractOptions(options = {}) {
     noCheckCertificates: true,
     flatPlaylist: options.flatPlaylist,
     proxy: options.proxy,
-    ...getYtDlpRuntimeOptions(),
+    ...getYtDlpRuntimeOptions(url),
     ...(options.userAgent ? { userAgent: options.userAgent } : {}),
     ...(options.cookiesFromBrowser ? { cookiesFromBrowser: options.cookiesFromBrowser } : {}),
   };
@@ -62,6 +62,10 @@ export function getAntiBotBackoffMs(attempt) {
 }
 
 const EXTRACTION_ERROR_HINTS = [
+  {
+    re: ANTI_BOT_CHALLENGE_RE,
+    message: 'The site is temporarily blocking automated requests. Try browser cookies, a different network, or --proxy.',
+  },
   {
     re: /video unavailable|this video has been removed|this video is no longer available|unavailable for legal reasons/i,
     message: 'This video is unavailable (removed, private, or deleted).',
@@ -126,7 +130,7 @@ export async function extractFormats(url, options = {}) {
   let lastError;
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
-      info = await youtubedl(url, getExtractOptions(options));
+      info = await youtubedl(url, getExtractOptions(options, url));
       break;
     } catch (err) {
       lastError = err;

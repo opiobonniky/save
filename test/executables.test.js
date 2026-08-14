@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { getBundledExecutable } from '../src/executables.js';
-import { getYtDlpRuntimeOptions } from '../src/runtime.js';
+import { BROWSER_USER_AGENT, getSiteRuntimeOptions, getYtDlpRuntimeOptions, TIKTOK_EXTRACTOR_ARGS } from '../src/runtime.js';
 
 const temporaryDirectories = [];
 
@@ -59,9 +59,16 @@ test('explicit tool overrides work outside packaged mode', () => {
 
 test('passes a bundled Deno path explicitly to yt-dlp', () => {
   process.env.SAVE_DENO = process.execPath;
+  assert.match(BROWSER_USER_AGENT, /Chrome\/139\./);
   assert.deepEqual(getYtDlpRuntimeOptions(), {
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+    userAgent: BROWSER_USER_AGENT,
     jsRuntimes: `deno:${process.execPath}`,
   });
+});
+
+test('tries TikTok mobile API metadata before the webpage fallback', () => {
+  assert.deepEqual(getSiteRuntimeOptions('https://www.tiktok.com/@creator/video/123'), {
+    extractorArgs: TIKTOK_EXTRACTOR_ARGS,
+  });
+  assert.deepEqual(getSiteRuntimeOptions('https://www.youtube.com/watch?v=123'), {});
 });
