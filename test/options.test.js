@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {
   AUDIO_FORMAT_SELECTOR,
   detectBackgroundedRun,
@@ -159,7 +160,7 @@ describe('shell truncation detection', () => {
 
 describe('default downloads directory', () => {
   test('defaults to the user Downloads folder', () => {
-    assert.equal(getDefaultDownloadsDir({ home: '/home/alice' }), '/home/alice/Downloads');
+    assert.equal(getDefaultDownloadsDir({ home: '/home/alice' }), path.join('/home/alice', 'Downloads'));
   });
 
   test('honors the XDG_DOWNLOAD_DIR override on Linux', () => {
