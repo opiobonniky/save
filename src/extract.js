@@ -57,6 +57,10 @@ export function isAntiBotChallenge(error) {
   return ANTI_BOT_CHALLENGE_RE.test(`${error?.stderr || ''}\n${error?.message || ''}`);
 }
 
+export function getAntiBotBackoffMs(attempt) {
+  return attempt < 4 ? 1500 * (attempt + 1) : null;
+}
+
 const EXTRACTION_ERROR_HINTS = [
   {
     re: /video unavailable|this video has been removed|this video is no longer available|unavailable for legal reasons/i,
@@ -131,13 +135,12 @@ export async function extractFormats(url, options = {}) {
       // Anti-bot challenges (TikTok) are rate-based and can take a few seconds
       // to clear, so retry more times with a longer backoff. Other transient
       // errors keep the original 3 attempts.
-      if (attempt >= (antiBot ? 4 : 2)) break;
-      const backoffMs = (antiBot ? 1500 : 500) * (attempt + 1);
-      if (antiBot) {
-        console.error(
-          `The site returned an unexpected or anti-bot response — retrying in ${Math.ceil(backoffMs / 1000)}s...`
-        );
-      }
+      const backoffMs = antiBot
+        ? getAntiBotBackoffMs(attempt)
+        : attempt < 2
+          ? 500 * (attempt + 1)
+          : null;
+      if (backoffMs === null) break;
       await new Promise(resolve => setTimeout(resolve, backoffMs));
     }
   }

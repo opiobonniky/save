@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   explainExtractionError,
   extractionSiteName,
+  getAntiBotBackoffMs,
   getExtractOptions,
   isAntiBotChallenge,
   isRetryableExtractionError,
@@ -54,6 +55,13 @@ test('classifies anti-bot challenges for longer retries', () => {
   );
   assert.equal(isAntiBotChallenge({ stderr: 'HTTP Error 429: Too Many Requests' }), false);
   assert.equal(isAntiBotChallenge({ stderr: 'This video is private' }), false);
+});
+
+test('backs off across four anti-bot retries before stopping', () => {
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map(getAntiBotBackoffMs),
+    [1500, 3000, 4500, 6000, null]
+  );
 });
 
 describe('explainExtractionError', () => {

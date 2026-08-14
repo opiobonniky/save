@@ -11,7 +11,9 @@ import { formatRow, isVideoOnly } from '../src/formatUtils.js';
 import { checkDependencies } from '../src/checkDeps.js';
 import { getConfig } from '../src/config.js';
 import {
+  AUDIO_FORMAT_SELECTOR,
   detectBackgroundedRun,
+  expandHomePath,
   getDefaultDownloadsDir,
   isLikelyPlaylistUrl,
   looksShellTruncated,
@@ -144,7 +146,7 @@ configCmd
     }
     if (key === 'quality') resolveQualitySelector(value);
     const storedValue = key === 'outputDir'
-      ? path.resolve(value.replace(/^~/, process.env.HOME || '~'))
+      ? path.resolve(expandHomePath(value))
       : key === 'connections'
         ? parseCount(value, 'connections')
         : value;
@@ -220,7 +222,7 @@ Tip:
 Deno 2.3+ is the recommended YouTube JavaScript runtime.`);
 
 async function resolveOutputDir(outputDirArg) {
-  if (outputDirArg) return path.resolve(outputDirArg);
+  if (outputDirArg) return path.resolve(expandHomePath(outputDirArg));
   const cfg = getConfig();
   const saved = cfg.get('outputDir');
   if (saved) return saved;
@@ -339,7 +341,7 @@ async function run(url, outputDirArg, options) {
     checkDependencies({ requireFfmpeg: true });
     console.log(chalk.gray(options.audio ? 'Using best available audio.' : `Using ${quality} quality.`));
     console.log(chalk.gray(`Saving to: ${outputDir}`));
-    await downloadVideo(url, options.audio ? 'bestaudio' : qualitySelector, outputDir, {
+    await downloadVideo(url, options.audio ? AUDIO_FORMAT_SELECTOR : qualitySelector, outputDir, {
       ...downloadOpts,
       fromPreset: !options.audio && !!qualitySelector,
       noPlaylist: true,
@@ -372,7 +374,7 @@ async function run(url, outputDirArg, options) {
   if (options.audio) {
     checkDependencies({ requireFfmpeg: true });
     console.log(chalk.gray(`Saving to: ${outputDir}`));
-    await downloadVideo(url, 'bestaudio', outputDir, downloadOpts);
+    await downloadVideo(url, AUDIO_FORMAT_SELECTOR, outputDir, downloadOpts);
     return;
   }
 
@@ -403,7 +405,7 @@ async function run(url, outputDirArg, options) {
     checkDependencies({ requireFfmpeg: true });
     console.log(chalk.gray('Downloading best audio and converting to MP3...'));
     console.log(chalk.gray(`Saving to: ${outputDir}`));
-    await downloadVideo(url, 'bestaudio', outputDir, { ...downloadOpts, audio: true });
+    await downloadVideo(url, AUDIO_FORMAT_SELECTOR, outputDir, { ...downloadOpts, audio: true });
     return;
   }
 

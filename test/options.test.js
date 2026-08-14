@@ -1,7 +1,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  AUDIO_FORMAT_SELECTOR,
   detectBackgroundedRun,
+  expandHomePath,
   getDefaultDownloadsDir,
   isLikelyPlaylistUrl,
   looksShellTruncated,
@@ -11,6 +13,10 @@ import {
   resolveQualitySelector,
   resolveMediaUrl,
 } from '../src/options.js';
+
+test('audio selection falls back to combined streams', () => {
+  assert.equal(AUDIO_FORMAT_SELECTOR, 'bestaudio/best');
+});
 
 describe('quality presets', () => {
   test('limits balanced quality to 1080p', () => {
@@ -161,6 +167,18 @@ describe('default downloads directory', () => {
       getDefaultDownloadsDir({ home: '/home/alice', xdgDownloadDir: '/mnt/big/downloads' }),
       '/mnt/big/downloads'
     );
+  });
+});
+
+describe('home directory expansion', () => {
+  test('expands POSIX and Windows home-relative paths', () => {
+    assert.equal(expandHomePath('~/Videos', '/home/alice'), '/home/alice/Videos');
+    assert.equal(expandHomePath('~\\Videos', 'C:\\Users\\Alice'), 'C:\\Users\\Alice\\Videos');
+  });
+
+  test('does not treat another user name or an ordinary tilde as the current home', () => {
+    assert.equal(expandHomePath('~bob/Videos', '/home/alice'), '~bob/Videos');
+    assert.equal(expandHomePath('archive~1', '/home/alice'), 'archive~1');
   });
 });
 

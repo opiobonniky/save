@@ -12,7 +12,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -21,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Syntax check
+        if: runner.os == 'Linux'
         run: |
           for f in bin/save.js src/*.js; do node --check "$f"; done
       - name: Run tests

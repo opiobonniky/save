@@ -45,7 +45,10 @@ if [ "$REMOVE_OLD" = true ]; then
 fi
 
 # Installing globally from the local folder:
+# - installs the runtime dependencies beside this checkout because npm links
+#   local folders rather than installing their dependencies globally
 # - registers save on PATH
+npm install --omit=dev
 npm install -g .
 
 echo ""

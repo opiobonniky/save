@@ -2,6 +2,8 @@ import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
 
+export const AUDIO_FORMAT_SELECTOR = 'bestaudio/best';
+
 export const QUALITY_SELECTORS = {
   best: 'bestvideo+bestaudio/best',
   '2160p': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
@@ -169,6 +171,11 @@ export function getDefaultDownloadsDir({
 } = {}) {
   if (xdgDownloadDir) return xdgDownloadDir;
   return path.join(home, 'Downloads');
+}
+
+export function expandHomePath(value, home = os.homedir()) {
+  if (!/^~(?=$|[\\/])/.test(value)) return value;
+  return `${home}${value.slice(1)}`;
 }
 
 export async function resolveMediaUrl(value, fetchImpl = globalThis.fetch) {

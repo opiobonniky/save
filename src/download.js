@@ -1,5 +1,5 @@
 import { spawnYtDlp } from './ytdlp.js';
-import { isAntiBotChallenge } from './extract.js';
+import { getAntiBotBackoffMs, isAntiBotChallenge } from './extract.js';
 import cliProgress from 'cli-progress';
 import path from 'path';
 import { notifyDone } from './notify.js';
@@ -7,6 +7,7 @@ import { parseProgressEvents } from './progress.js';
 import { getYtDlpRuntimeOptions } from './runtime.js';
 import { getFfmpegOptions } from './ffmpeg.js';
 import { canRun } from './executables.js';
+import { AUDIO_FORMAT_SELECTOR } from './options.js';
 
 function createProgressBar(options, preset, disabled) {
   if (!disabled) return new cliProgress.SingleBar(options, preset);
@@ -52,7 +53,7 @@ function createProgressBar(options, preset, disabled) {
  * @param {boolean} opts.timing     - print phase timings after completion
  */
 export async function downloadVideo(url, formatId, outputDir, opts = {}) {
-  const startedAt = Date.now();
+  const startedAt = opts.startedAt || Date.now();
   let firstProgressAt = null;
   let processingStartedAt = null;
   const bar = createProgressBar(
@@ -193,10 +194,15 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     // TikTok-style anti-bot challenges can also hit the download phase; give
     // the challenge a few seconds to clear and retry once before giving up.
     // (Same predicate as extraction, so the two can't drift apart.)
-    if (!opts.retriedAntiBot && isAntiBotChallenge({ stderr: stderrBuffer })) {
-      console.log('\nThe site returned an unexpected or anti-bot response — retrying in 3s...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      return downloadVideo(url, formatId, outputDir, { ...opts, retriedAntiBot: true });
+    const antiBotAttempt = opts.antiBotAttempt || 0;
+    const antiBotBackoffMs = getAntiBotBackoffMs(antiBotAttempt);
+    if (antiBotBackoffMs !== null && isAntiBotChallenge({ stderr: stderrBuffer })) {
+      await new Promise(resolve => setTimeout(resolve, antiBotBackoffMs));
+      return downloadVideo(url, formatId, outputDir, {
+        ...opts,
+        startedAt,
+        antiBotAttempt: antiBotAttempt + 1,
+      });
     }
     // Sites with combined-only streams (e.g. TikTok) can't satisfy the
     // video-only selectors that --quality presets expand to (they always
@@ -208,15 +214,12 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
       opts.fromPreset &&
       /Requested format is not available/i.test(stderrBuffer)
     ) {
-      console.log(
-        '\nThat format is not available on this site — retrying with the best available format...'
-      );
-      return downloadVideo(url, 'best', outputDir, { ...opts, retriedBest: true });
+      return downloadVideo(url, 'best', outputDir, { ...opts, startedAt, retriedBest: true });
     }
     const hint = /(?:timed? out|timeout)/i.test(stderrBuffer)
       ? '\n(The site connection timed out. Check your network, use a system-wide VPN, or pass --proxy <url> if the site is blocked.)'
       : /\[TikTok\].*(?:Unexpected response|universal data)/i.test(stderrBuffer)
-      ? '\n(TikTok served a bot-detection page. Retry, use a different network or --proxy, or pass --cookies-from-browser-like real browser cookies. A Chrome user-agent is already sent by default; override with --user-agent.)'
+      ? '\n(TikTok served a bot-detection page. Retry, use a different network or --proxy, or pass --cookies-from-browser <browser>. A Chrome user-agent is already sent by default; override with --user-agent.)'
       : /ffmpeg/i.test(stderrBuffer)
       ? '\n(ffmpeg processing failed. Run save doctor and reinstall the package if ffmpeg is missing.)'
       : usingAria2c
@@ -294,7 +297,7 @@ export async function downloadPlaylist(url, outputDir, opts = {}) {
     yesPlaylist: true,
     proxy: opts.proxy,
     ignoreErrors: true, // one broken video in a playlist shouldn't abort the whole batch
-    format: opts.audio ? 'bestaudio' : opts.format || 'bestvideo+bestaudio/best',
+    format: opts.audio ? AUDIO_FORMAT_SELECTOR : opts.format || 'bestvideo+bestaudio/best',
     concurrentFragments: opts.connections || 4,
     ...getYtDlpRuntimeOptions(),
     ...getFfmpegOptions(),
