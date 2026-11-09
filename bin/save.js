@@ -23,7 +23,7 @@ import {
   resolveMediaUrl,
   resolveQualitySelector,
 } from '../src/options.js';
-import { StatusBar, prettySiteName } from '../src/status.js';
+import { extractionStatus, StatusBar } from '../src/status.js';
 import { getRuntimeDiagnostics } from '../src/runtime.js';
 import { parseBatchLines, runWorkerPool } from '../src/batch.js';
 import { VERSION } from '../src/version.js';
@@ -356,19 +356,8 @@ async function run(url, outputDirArg, options) {
   }
   const onExtractStatus = (event) => {
     if (!fetchBar.enabled) return;
-    const subject = prettySiteName(event.site);
-    if (event.attempt === 1) {
-      fetchBar.start(`Fetching video info from ${subject}…`);
-      return;
-    }
-    if (event.backoffMs) {
-      const antiBot = event.antiBot ? 'Anti-bot check — ' : '';
-      fetchBar.update(
-        `${antiBot}${subject} ${event.reason} — retry ${event.attempt}/${event.total} in ${Math.ceil(event.backoffMs / 1000)}s`
-      );
-      return;
-    }
-    fetchBar.update(`${subject} ${event.reason} — retrying (attempt ${event.attempt}/${event.total})`);
+    const status = extractionStatus(event);
+    if (status) fetchBar.start(status);
   };
   let result;
   try {

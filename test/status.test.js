@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { StatusBar, prettySiteName } from '../src/status.js';
+import { extractionStatus, StatusBar, prettySiteName } from '../src/status.js';
 
 describe('prettySiteName', () => {
   test('maps known sites to friendly names', () => {
@@ -11,6 +11,12 @@ describe('prettySiteName', () => {
     assert.equal(prettySiteName(null), 'the server');
     assert.equal(prettySiteName(''), 'the server');
   });
+});
+
+test('keeps extraction retries silent', () => {
+  assert.equal(extractionStatus({ type: 'attempt', attempt: 1, site: 'tiktok' }), 'Fetching video info from TikTok…');
+  assert.equal(extractionStatus({ type: 'waiting', attempt: 1, site: 'tiktok' }), null);
+  assert.equal(extractionStatus({ type: 'attempt', attempt: 2, site: 'tiktok' }), null);
 });
 
 function fakeStream() {
@@ -42,8 +48,8 @@ describe('StatusBar', () => {
     const bar = new StatusBar({ stream });
     bar.start('Fetching video info from YouTube…');
     stream.writes.length = 0;
-    bar.update('Anti-bot check — TikTok is checking to make sure we are not a bot — retry 2/6 in 3s');
-    assert.ok(stream.writes.join('').includes('Anti-bot check — TikTok is checking'));
+    bar.update('Fetching video info from TikTok…');
+    assert.ok(stream.writes.join('').includes('Fetching video info from TikTok…'));
   });
 
   test('clears the line when finished', () => {

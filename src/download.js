@@ -30,6 +30,12 @@ function createProgressBar(options, preset, disabled) {
 export function getForbiddenFallbackFormat(formatId, detail, opts = {}) {
   const fallback = 'bestvideo+bestaudio/best';
   if (opts.audio || opts.retriedForbidden || !/HTTP Error 403: Forbidden/i.test(detail)) return null;
+  // Widening a *specific* format to the generic best is safe (equal or higher
+  // quality). But when the request is already "best", retrying the same
+  // selector through an alternate player client can resolve to a far lower
+  // resolution (the SABR-limited android client only offers 360p for many
+  // videos), turning the "Best quality (recommended)" pick into a silent
+  // downgrade. Refuse that here and surface the failure instead.
   return formatId === fallback ? null : fallback;
 }
 
@@ -205,8 +211,6 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
     const antiBotAttempt = opts.antiBotAttempt || 0;
     const antiBotBackoffMs = getAntiBotBackoffMs(antiBotAttempt);
     if (antiBotBackoffMs !== null && isAntiBotChallenge({ stderr: stderrBuffer })) {
-      const waitSeconds = Math.ceil(antiBotBackoffMs / 1000);
-      console.log(`\n${subject} is running an anti-bot check — waiting ${waitSeconds}s before trying again.`);
       await new Promise(resolve => setTimeout(resolve, antiBotBackoffMs));
       return downloadVideo(url, formatId, outputDir, {
         ...opts,
@@ -214,9 +218,24 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
         antiBotAttempt: antiBotAttempt + 1,
       });
     }
+    // A 403 usually means the media URL expired or was refused. Re-running the
+    // *same* request fetches fresh URLs and keeps the selected quality, unlike
+    // switching clients/formats, which can silently resolve to something much
+    // lower. Only after these retries do we consider a different format.
+    const forbiddenAttempt = opts.forbiddenAttempt || 0;
+    if (forbiddenAttempt < 2 && /HTTP Error 403: Forbidden/i.test(stderrBuffer)) {
+      await new Promise(resolve => setTimeout(resolve, (forbiddenAttempt + 1) * 1000));
+      return downloadVideo(url, formatId, outputDir, {
+        ...opts,
+        startedAt,
+        forbiddenAttempt: forbiddenAttempt + 1,
+      });
+    }
     const forbiddenFallback = getForbiddenFallbackFormat(formatId, stderrBuffer, opts);
     if (forbiddenFallback) {
-      console.log('\nThe site blocked the media stream (HTTP 403) — switching to an alternate stream.');
+      console.log(
+        '\nThe site refused the selected stream (HTTP 403) — downloading the best available quality instead.'
+      );
       return downloadVideo(url, forbiddenFallback, outputDir, {
         ...opts,
         startedAt,
@@ -234,10 +253,11 @@ export async function downloadVideo(url, formatId, outputDir, opts = {}) {
       opts.fromPreset &&
       /Requested format is not available/i.test(stderrBuffer)
     ) {
-      console.log("\nThat quality isn't available here — using the best available format instead.");
       return downloadVideo(url, 'best', outputDir, { ...opts, startedAt, retriedBest: true });
     }
-    const hint = /(?:timed? out|timeout)/i.test(stderrBuffer)
+    const hint = /HTTP Error 403: Forbidden/i.test(stderrBuffer)
+      ? '\n(The site refused the media stream (HTTP 403). On YouTube this commonly happens without a JavaScript runtime or with an out-of-date yt-dlp: install Deno 2.3+ (or use Node.js 22+), run `save doctor`, update yt-dlp, then retry. Any .part file is kept so the download can resume.)'
+      : /(?:timed? out|timeout)/i.test(stderrBuffer)
       ? '\n(The site connection timed out. Check your network, use a system-wide VPN, or pass --proxy <url> if the site is blocked.)'
       : /\[TikTok\].*(?:Unexpected response|universal data)/i.test(stderrBuffer)
       ? '\n(TikTok served a bot-detection page. Retry, use a different network or --proxy, or pass --cookies-from-browser <browser>. A Chrome user-agent is already sent by default; override with --user-agent.)'

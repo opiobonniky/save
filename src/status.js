@@ -22,12 +22,15 @@ export function prettySiteName(site) {
   return SITE_NAMES[base] || base;
 }
 
+export function extractionStatus(event) {
+  if (event.type !== 'attempt' || event.attempt !== 1) return null;
+  return `Fetching video info from ${prettySiteName(event.site)}…`;
+}
+
 /**
  * A single-line, indeterminate progress bar for phases without a known total
  * (fetching metadata, retrying a stream). A shaded block sweeps back and forth
- * while the status label updates in place — no stacked lines. When the phase
- * changes (e.g. an anti-bot retry), the label jumps to the next step with a
- * short explanation and the attempt counter.
+ * while the status label updates in place without exposing transient failures.
  *
  * Falls back to no output on non-TTY streams or when progress is disabled, so
  * callers can print a plain one-shot line instead.
