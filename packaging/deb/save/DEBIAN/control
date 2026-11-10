@@ -3,12 +3,8 @@ Version: 1.1.7-1
 Section: utils
 Priority: optional
 Architecture: amd64
-Recommends: aria2
 Maintainer: Boniface <opiobonniky@users.noreply.github.com>
-Description: Download videos from YouTube, TikTok, Facebook, and more
- A terminal tool for downloading videos from YouTube, TikTok, Facebook,
- and hundreds of other sites, with an interactive format picker and
- optional multi-connection acceleration via aria2c.
- This package is self-contained: it bundles the application runtime and
- its own yt-dlp, ffmpeg, ffprobe, and Deno binaries, so no media tools
- need to be installed separately.
+Description: Standalone client for the Download Me backend
+ Inspect videos, select formats and retrieve server-prepared downloads.
+ Requires a reachable Download Me API. The client embeds its runtime;
+ no Node.js, Python, yt-dlp or ffmpeg installation is needed.

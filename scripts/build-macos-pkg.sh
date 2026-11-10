@@ -41,7 +41,7 @@ cp -a "$STANDALONE" "$PKG_ROOT/usr/local/lib/save"
 rm -f "$PKG_ROOT/usr/local/lib/save/install.sh" "$PKG_ROOT/usr/local/lib/save/uninstall.sh"
 find "$PKG_ROOT/usr/local/lib/save" -type d -exec chmod 755 {} +
 find "$PKG_ROOT/usr/local/lib/save" -type f -exec chmod 644 {} +
-chmod 755 "$PKG_ROOT/usr/local/lib/save/save" "$PKG_ROOT/usr/local/lib/save/libexec/"*
+chmod 755 "$PKG_ROOT/usr/local/lib/save/save"
 ln -s ../lib/save/save "$PKG_ROOT/usr/local/bin/save"
 
 pkgbuild \

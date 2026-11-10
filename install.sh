@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # One-shot installer for save.
 # Run this once: bash install.sh
-# It handles the global install and PATH setup via npm. The package includes
-# managed yt-dlp and ffmpeg binaries, so no system packages are required.
-# The user never has to configure anything manually.
+# Developer/source installer using npm. For Node-free end-user installation,
+# use install.sh from the standalone archive instead. Media tools run remotely.
 
 set -e
 
@@ -11,7 +10,7 @@ echo "Installing save..."
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is required but wasn't found."
-  echo "Install it first: https://nodejs.org (or 'sudo apt install nodejs npm')"
+  echo "Use the standalone release archive for installation without Node.js."
   exit 1
 fi
 

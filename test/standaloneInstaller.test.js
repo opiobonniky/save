@@ -20,12 +20,9 @@ function fixture() {
   const archive = path.join(base, 'archive');
   const prefix = path.join(base, 'prefix');
   const oldBin = path.join(base, 'old-bin');
-  mkdirSync(path.join(archive, 'libexec'), { recursive: true });
+  mkdirSync(archive, { recursive: true });
   mkdirSync(oldBin);
   executable(path.join(archive, 'save'), '#!/bin/sh\nprintf "1.1.9\\n"\n');
-  for (const tool of ['yt-dlp', 'ffmpeg', 'ffprobe', 'deno']) {
-    executable(path.join(archive, 'libexec', tool));
-  }
   writeFileSync(path.join(archive, '.standalone-package'), '@opiobonniky/save standalone\n');
   cpSync(path.join(root, 'install-standalone.sh'), path.join(archive, 'install.sh'));
   cpSync(path.join(root, 'uninstall.sh'), path.join(archive, 'uninstall.sh'));

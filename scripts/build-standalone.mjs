@@ -1,179 +1,54 @@
 import AdmZip from 'adm-zip';
-import { createHash } from 'crypto';
-import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
-import path from 'path';
-import { spawnSync } from 'child_process';
-import { build as buildWithEsbuild } from 'esbuild';
-import ffmpegPath from 'ffmpeg-static';
-import ffprobeInstaller from '@ffprobe-installer/ffprobe';
-import { DENO_VERSION, YT_DLP_VERSION } from '../src/toolVersions.js';
-import { parseExpectedChecksum } from '../src/standaloneChecksum.js';
+import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { build } from 'esbuild';
 
-const root = path.resolve(import.meta.dirname, '..');
-const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const platform = process.platform;
 const arch = process.arch;
-
-const targets = {
-  'linux-x64': {
-    pkg: 'node18-linux-x64',
-    ytDlp: 'yt-dlp_linux',
-    deno: 'deno-x86_64-unknown-linux-gnu.zip',
-  },
-  'win32-x64': {
-    pkg: 'node18-win-x64',
-    ytDlp: 'yt-dlp.exe',
-    deno: 'deno-x86_64-pc-windows-msvc.zip',
-  },
-  'darwin-x64': {
-    pkg: 'node18-macos-x64',
-    ytDlp: 'yt-dlp_macos',
-    deno: 'deno-x86_64-apple-darwin.zip',
-  },
-  'darwin-arm64': {
-    pkg: 'node18-macos-arm64',
-    ytDlp: 'yt-dlp_macos',
-    deno: 'deno-aarch64-apple-darwin.zip',
-  },
-};
-
-const target = targets[`${platform}-${arch}`];
+const target = {
+  'linux-x64': 'node18-linux-x64',
+  'win32-x64': 'node18-win-x64',
+  'darwin-x64': 'node18-macos-x64',
+  'darwin-arm64': 'node18-macos-arm64',
+}[`${platform}-${arch}`];
 if (!target) throw new Error(`Unsupported standalone target: ${platform}-${arch}`);
 
-const platformName = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'macos' : platform;
-const executableSuffix = platform === 'win32' ? '.exe' : '';
-const artifactName = `save-${packageJson.version}-${platformName}-${arch}`;
-const packageDir = path.join(root, 'dist', artifactName);
-const libexecDir = path.join(packageDir, 'libexec');
-const cacheDir = path.join(root, 'dist', '.standalone-cache');
-const appPath = path.join(packageDir, `save${executableSuffix}`);
-const standaloneMarker = '@opiobonniky/save standalone\n';
+const name = `save-${manifest.version}-${platform === 'win32' ? 'windows' : platform === 'darwin' ? 'macos' : platform}-${arch}`;
+const directory = path.join(root, 'dist', name);
+// Never mix an old tool-filled package into a backend-only release.
+if (existsSync(directory)) throw new Error(`Output already exists: ${directory}. Move it aside before rebuilding.`);
+mkdirSync(directory, { recursive: true });
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', ...options });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}`);
+  if (result.status !== 0) throw new Error(`${command} exited with ${result.status}`);
 }
 
-async function download(url, destination) {
-  const response = await fetch(url, { redirect: 'follow' });
-  if (!response.ok) throw new Error(`Download failed (${response.status}): ${url}`);
-  writeFileSync(destination, Buffer.from(await response.arrayBuffer()));
+await build({ entryPoints: [path.join(root, 'bin/save.js')], bundle: true, platform: 'node', format: 'cjs',
+  target: 'node18', outfile: path.join(root, 'dist/save.cjs') });
+const executable = path.join(directory, platform === 'win32' ? 'save.exe' : 'save');
+run(process.execPath, [path.join(root, 'node_modules/@yao-pkg/pkg/lib-es5/bin.js'), 'dist/save.cjs', '--targets', target, '--output', executable]);
+if (platform !== 'win32') chmodSync(executable, 0o755);
+writeFileSync(path.join(directory, '.standalone-package'), '@opiobonniky/save standalone\n');
+for (const filename of ['README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md']) cpSync(path.join(root, filename), path.join(directory, filename));
+if (platform === 'win32') writeFileSync(path.join(directory, 'save.cmd'), '@echo off\r\n"%~dp0save.exe" %*\r\n');
+else {
+  copyFileSync(path.join(root, 'install-standalone.sh'), path.join(directory, 'install.sh'));
+  copyFileSync(path.join(root, 'uninstall.sh'), path.join(directory, 'uninstall.sh'));
+  chmodSync(path.join(directory, 'install.sh'), 0o755);
+  chmodSync(path.join(directory, 'uninstall.sh'), 0o755);
 }
+if (platform === 'darwin') run('codesign', ['--force', '--sign', '-', executable]);
 
-function sha256(filePath) {
-  return createHash('sha256').update(readFileSync(filePath)).digest('hex');
-}
-
-async function downloadVerified(url, checksumUrl, destination, assetName) {
-  const checksumPath = `${destination}.sha256`;
-  await Promise.all([download(url, destination), download(checksumUrl, checksumPath)]);
-  const checksumText = readFileSync(checksumPath, 'utf8');
-  const expected = parseExpectedChecksum(
-    checksumText,
-    assetName,
-    checksumUrl.endsWith(`${assetName}.sha256sum`)
-  );
-  const actual = sha256(destination);
-  if (!expected || expected !== actual) throw new Error(`Checksum verification failed for ${assetName}`);
-  rmSync(checksumPath, { force: true });
-}
-
-function copyExecutable(source, destination) {
-  copyFileSync(source, destination);
-  if (platform !== 'win32') chmodSync(destination, 0o755);
-}
-
-mkdirSync(path.join(root, 'dist'), { recursive: true });
-mkdirSync(cacheDir, { recursive: true });
-rmSync(packageDir, { recursive: true, force: true });
-mkdirSync(libexecDir, { recursive: true });
-
-await buildWithEsbuild({
-  entryPoints: [path.join(root, 'bin', 'save.js')],
-  bundle: true,
-  platform: 'node',
-  format: 'cjs',
-  outfile: path.join(root, 'dist', 'save.cjs'),
-});
-const pkgBin = path.join(root, 'node_modules', '@yao-pkg', 'pkg', 'lib-es5', 'bin.js');
-const builtApp = path.join(root, 'dist', `save-${platformName}-${arch}${executableSuffix}`);
-run(process.execPath, [pkgBin, 'dist/save.cjs', '--targets', target.pkg, '--output', builtApp]);
-copyExecutable(builtApp, appPath);
-writeFileSync(path.join(packageDir, '.standalone-package'), standaloneMarker);
-if (platform === 'win32') {
-  writeFileSync(path.join(packageDir, 'save.cmd'), '@echo off\r\n"%~dp0save.exe" %*\r\n');
-}
-
-const ytDlpDestination = path.join(libexecDir, `yt-dlp${executableSuffix}`);
-await downloadVerified(
-  `https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/${target.ytDlp}`,
-  `https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/SHA2-256SUMS`,
-  ytDlpDestination,
-  target.ytDlp
-);
-if (platform !== 'win32') chmodSync(ytDlpDestination, 0o755);
-
-const denoArchive = path.join(cacheDir, target.deno);
-await downloadVerified(
-  `https://github.com/denoland/deno/releases/download/${DENO_VERSION}/${target.deno}`,
-  `https://github.com/denoland/deno/releases/download/${DENO_VERSION}/${target.deno}.sha256sum`,
-  denoArchive,
-  target.deno
-);
-new AdmZip(denoArchive).extractAllTo(libexecDir, true);
-if (platform !== 'win32') chmodSync(path.join(libexecDir, 'deno'), 0o755);
-
-copyExecutable(ffmpegPath, path.join(libexecDir, `ffmpeg${executableSuffix}`));
-copyExecutable(ffprobeInstaller.path, path.join(libexecDir, `ffprobe${executableSuffix}`));
-
-cpSync(path.join(root, 'README.md'), path.join(packageDir, 'README.md'));
-cpSync(path.join(root, 'LICENSE'), path.join(packageDir, 'LICENSE'));
-cpSync(path.join(root, 'THIRD_PARTY_NOTICES.md'), path.join(packageDir, 'THIRD_PARTY_NOTICES.md'));
-if (platform !== 'win32') {
-  copyExecutable(path.join(root, 'install-standalone.sh'), path.join(packageDir, 'install.sh'));
-  copyExecutable(path.join(root, 'uninstall.sh'), path.join(packageDir, 'uninstall.sh'));
-}
-mkdirSync(path.join(packageDir, 'licenses'), { recursive: true });
-cpSync(
-  `${ffmpegPath}.LICENSE`,
-  path.join(packageDir, 'licenses', 'FFMPEG-GPL-3.0.txt')
-);
-cpSync(
-  `${ffmpegPath}.README`,
-  path.join(packageDir, 'licenses', 'FFMPEG-BUILD-README.txt')
-);
-await Promise.all([
-  download(
-    `https://raw.githubusercontent.com/denoland/deno/${DENO_VERSION}/LICENSE.md`,
-    path.join(packageDir, 'licenses', 'DENO-LICENSE.md')
-  ),
-  download(
-    `https://raw.githubusercontent.com/yt-dlp/yt-dlp/${YT_DLP_VERSION}/LICENSE`,
-    path.join(packageDir, 'licenses', 'YT-DLP-LICENSE.txt')
-  ),
-  download(
-    `https://raw.githubusercontent.com/yt-dlp/yt-dlp/${YT_DLP_VERSION}/THIRD_PARTY_LICENSES.txt`,
-    path.join(packageDir, 'licenses', 'YT-DLP-THIRD-PARTY-LICENSES.txt')
-  ),
-]);
-
-if (platform === 'darwin') {
-  const binaries = [appPath, ...['yt-dlp', 'ffmpeg', 'ffprobe', 'deno'].map(name => path.join(libexecDir, name))];
-  for (const binary of binaries) run('codesign', ['--force', '--sign', '-', binary]);
-}
-
-const cleanEnv = { ...process.env, PATH: libexecDir };
-run(appPath, ['--version'], { env: cleanEnv });
-run(appPath, ['doctor'], { env: cleanEnv });
-
-const archivePath = path.join(root, 'dist', `${artifactName}.zip`);
-rmSync(archivePath, { force: true });
-if (platform === 'win32') {
-  const archive = new AdmZip();
-  archive.addLocalFolder(packageDir, artifactName);
-  archive.writeZip(archivePath);
-} else {
-  run('zip', ['-qry', archivePath, artifactName], { cwd: path.join(root, 'dist') });
-}
-console.log(`Built ${path.relative(root, archivePath)}`);
+// The distributed client must run without node, yt-dlp, ffmpeg or a live backend.
+for (const args of [['--version'], ['--help']]) run(executable, args, { env: { ...process.env, PATH: '' } });
+const zip = new AdmZip();
+zip.addLocalFolder(directory, name);
+const archive = path.join(root, 'dist', `${name}.zip`);
+zip.writeZip(archive);
+console.log(`Built backend-only client: ${archive}`);

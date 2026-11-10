@@ -1,6 +1,11 @@
 # Third-Party Notices
 
-The dependency-free release archives redistribute these tools:
+Backend-only release archives embed a Node.js runtime (Node.js and bundled
+dependency license notices: https://github.com/nodejs/node/blob/v18.x/LICENSE)
+and the JavaScript client dependencies listed in package.json. They no longer
+redistribute yt-dlp, ffmpeg, ffprobe or Deno. Media tools run only on the backend.
+
+The following notices describe older local-engine release archives only:
 
 - yt-dlp `2026.07.04`: official standalone executable. The combined executable
   contains components under GPL-3.0-or-later and other licenses. Source:

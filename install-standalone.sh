@@ -98,7 +98,7 @@ case "$(uname -s)" in
     ;;
 esac
 
-for executable in save libexec/yt-dlp libexec/ffmpeg libexec/ffprobe libexec/deno; do
+for executable in save; do
   if [ ! -x "$SOURCE_DIR/$executable" ]; then
     echo "Missing bundled executable: $executable"
     echo "Run this installer from inside an extracted dependency-free archive."
@@ -154,7 +154,7 @@ as_root cp -R "$SOURCE_DIR/." "$STAGING_DIR/"
 if [ -f "$STATE_FILE" ]; then
   as_root cp "$STATE_FILE" "$STAGING_DIR/.installed-command-links"
 fi
-as_root chmod +x "$STAGING_DIR/save" "$STAGING_DIR/libexec/"*
+as_root chmod +x "$STAGING_DIR/save"
 
 if ! "$STAGING_DIR/save" --version >/dev/null; then
   as_root rm -rf "$STAGING_DIR"

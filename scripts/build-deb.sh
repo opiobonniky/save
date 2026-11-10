@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Builds a self-contained .deb package from the dependency-free standalone
-# application. The package bundles the app runtime plus its own yt-dlp,
-# ffmpeg, ffprobe, and Deno binaries, so target systems do not need those
-# tools (or Node.js, Python, etc.) installed separately.
+# backend client with embedded runtime; media tools run only on the server.
 set -e
 
 VERSION="$(node -p "require('./package.json').version")"
@@ -21,14 +19,12 @@ rm -rf "$PKG_DIR"
 mkdir -p "$PKG_DIR/DEBIAN" "$PKG_DIR/usr/bin" "$PKG_DIR/usr/lib"
 chmod 755 "$PKG_DIR" "$PKG_DIR/DEBIAN" "$PKG_DIR/usr" "$PKG_DIR/usr/bin" "$PKG_DIR/usr/lib"
 
-# App + private tools installed under /usr/lib/save; /usr/bin/save
-# is a symlink to it. The application resolves its libexec tools relative to
-# its own location, so the two directories must stay together.
+# The backend-only executable is installed under /usr/lib/save.
 cp -a "$STANDALONE" "$PKG_DIR/usr/lib/save"
 rm -f "$PKG_DIR/usr/lib/save/install.sh" "$PKG_DIR/usr/lib/save/uninstall.sh"
 find "$PKG_DIR/usr/lib/save" -type d -exec chmod 755 {} +
 find "$PKG_DIR/usr/lib/save" -type f -exec chmod 644 {} +
-chmod 755 "$PKG_DIR/usr/lib/save/save" "$PKG_DIR/usr/lib/save/libexec/"*
+chmod 755 "$PKG_DIR/usr/lib/save/save"
 ln -s ../lib/save/save "$PKG_DIR/usr/bin/save"
 
 cp -r packaging/deb/save/DEBIAN/* "$PKG_DIR/DEBIAN/"
@@ -40,4 +36,4 @@ cp "${PKG_DIR}.deb" "dist/save_${PKG_VER}_${ARCH}.deb"
 
 echo "Built: dist/save_${PKG_VER}_${ARCH}.deb"
 echo "Install with: sudo apt install ./dist/save_${PKG_VER}_${ARCH}.deb"
-echo "Self-contained: bundles yt-dlp, ffmpeg, ffprobe, and Deno — no system media packages required."
+echo "Backend client: no Node.js or local media tools required."
