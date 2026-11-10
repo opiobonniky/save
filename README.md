@@ -9,7 +9,7 @@ Node.js or extra media software to install when using the standalone package.
 On Ubuntu or Debian, open the .deb with your software installer, or run:
 
 ```sh
-sudo apt install ./save_2.0.0-1_amd64.deb
+sudo apt install ./save_2.0.1-1_amd64.deb
 ```
 
 If apt shows “Setting up save” followed by “Download is performed unsandboxed as
@@ -46,6 +46,16 @@ Without a quality option, select a format from the menu. Files go to your
 Downloads folder unless you choose another folder after the link. Wait for
 “Saved:” and the file location, then open the video with your usual player.
 
+The menu shows one recommended format per resolution, highest first, followed
+by one audio source and an MP3 conversion option—like the website, without codec
+duplicates. Sizes describe the source stream; ≈ marks estimates and adding audio
+can change the final size. MP3 output size is not known in advance.
+
+While waiting, an animated status shows activity and elapsed time. Once transfer
+progress is available, it shows a percentage bar. Saving to your computer shows
+bytes, speed and an estimated time remaining when the file size is known. Logs
+and non-interactive terminals receive simple phase messages instead of animation.
+
 ## Save audio
 
 ```sh
@@ -80,6 +90,8 @@ link stops the command so you can fix it before trying again.
 | `-r` | `--report-usage` | Opt into visit reporting |
 | `-h` | `--help` | Show help |
 | `-V` | `--version` | Show the version |
+
+`save -v` also prints the version. The installed command is `save`, not `download-me`.
 
 ## Need a hand?
 

@@ -6,7 +6,8 @@ import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { BackendClient } from '../src/backendClient.js';
-import { chooseBackendFormat, backendFormatLabel } from '../src/backendFormats.js';
+import { chooseBackendFormat, backendFormatLabel, selectCompatibleFormats, buildBackendChoices } from '../src/backendFormats.js';
+import { TerminalProgress } from '../src/terminalProgress.js';
 import { getConfig } from '../src/config.js';
 import { VERSION } from '../src/version.js';
 
@@ -16,6 +17,7 @@ const apiUrl = options => options.backend || process.env.SAVE_BACKEND_URL || con
 const outputPath = value => path.resolve(value?.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value || config.get('outputDir') || path.join(os.homedir(), 'Downloads'));
 
 program.name('save').version(VERSION)
+  .option('-v', 'show the installed version', () => { console.log(VERSION); process.exit(0); })
   .description('Save YouTube videos and MP3s. Connects automatically; no extra tools needed.')
   .argument('[url]', 'single YouTube video URL')
   .argument('[outputDir]', 'destination (default: Downloads or saved config)')
@@ -29,6 +31,7 @@ program.name('save').version(VERSION)
   .option('-b, --batch <file>', 'download video URLs from a text file, sequentially')
   .option('-r, --report-usage', 'opt in to recording a CLI visit with IP/client details')
   .action(async (url, directory, options) => {
+    const activity = new TerminalProgress();
     const controller = new AbortController();
     const stop = () => controller.abort();
     process.once('SIGINT', stop);
@@ -40,43 +43,52 @@ program.name('save').version(VERSION)
         : [url];
       if (!urls.length || urls.some(value => !value)) throw new Error('Provide a video URL or --batch <file>.');
       const client = new BackendClient(apiUrl(options));
+      activity.start('Connecting to Download Me');
       await client.connect(controller.signal);
+      activity.stop();
       if (options.reportUsage) {
         await client.json('/tracking/page-views', { method: 'POST', body: { eventId: randomUUID(), page: 'downloads', source: 'CLI' }, signal: controller.signal }).catch(() => {});
       }
       for (const input of urls) {
-        console.log('Getting video details…');
+        activity.start('Finding video qualities and sizes');
         const extraction = await client.inspect(input, { signal: controller.signal });
+        activity.stop();
         console.log(extraction.title);
+        const recommended = selectCompatibleFormats(extraction.formats);
         if (options.listFormats) {
-          for (const format of extraction.formats) console.log(backendFormatLabel(format));
+          for (const format of recommended) console.log(`${backendFormatLabel(format)} · ID ${format.id}`);
           continue;
         }
+        console.log('One recommended format per quality. ≈ is estimated; adding audio or MP3 conversion can change the final size.');
         let selection = { format: options.format, quality: options.quality || config.get('quality') || 'best', audio: Boolean(options.audio) };
+        let outputKind = options.audio ? 'mp3' : 'original';
         if (!options.audio && !options.format && (options.choose || (!options.quality && !config.get('quality') && process.stdin.isTTY))) {
           if (!process.stdin.isTTY) throw new Error('--choose requires an interactive terminal. Use --quality or --format.');
-          const { format } = await inquirer.prompt([{ type: 'list', name: 'format', message: 'Choose a format:',
-            choices: extraction.formats.map(item => ({ name: backendFormatLabel(item), value: item.id })), pageSize: 15 }]);
-          selection = { format, audio: false };
+          const { choice } = await inquirer.prompt([{ type: 'list', name: 'choice', message: 'Choose what to download:',
+            choices: buildBackendChoices(extraction.formats), pageSize: 12 }]);
+          selection = { format: choice.formatId, audio: choice.outputKind === 'mp3' };
+          outputKind = choice.outputKind;
         }
         const format = chooseBackendFormat(extraction.formats, selection);
-        console.log(`Preparing ${backendFormatLabel(format)}…`);
-        let previous;
-        const job = await client.prepare(extraction.id, format.id, options.audio ? 'mp3' : 'original', {
+        console.log(`Selected: ${outputKind === 'mp3' ? 'MP3 · ' : ''}${backendFormatLabel(format)}`);
+        activity.start('Preparing your download');
+        const job = await client.prepare(extraction.id, format.id, outputKind, {
           signal: controller.signal,
-          onProgress: job => {
-            const progress = `${job.status} ${job.progress ?? 0}%`;
-            if (progress !== previous) console.log(progress);
-            previous = progress;
-          },
+          onProgress: job => activity.job(job),
         });
-        const file = await client.saveArtifact(job, outputPath(options.batch ? directory || url : directory), { overwrite: options.overwrite, signal: controller.signal });
+        activity.start('Saving file to your computer');
+        const file = await client.saveArtifact(job, outputPath(options.batch ? directory || url : directory), {
+          overwrite: options.overwrite, signal: controller.signal, onProgress: progress => activity.transfer(progress),
+        });
+        activity.stop();
         console.log(`Saved: ${file}`);
       }
     } catch (error) {
+      activity.stop();
       console.error(controller.signal.aborted ? 'Download interrupted.' : `Error: ${error.message}`);
       process.exitCode = controller.signal.aborted ? 130 : 1;
     } finally {
+      activity.stop();
       process.removeListener('SIGINT', stop);
       process.removeListener('SIGTERM', stop);
     }

@@ -26,3 +26,9 @@ test('doctor also exposes the short backend option', () => {
   const help = execFileSync(process.execPath, [entry, 'doctor', '-h'], { encoding: 'utf8' });
   assert.ok(help.includes('-s, --backend'));
 });
+
+test('lowercase -v prints the version, just like -V and --version', () => {
+  const version = execFileSync(process.execPath, [entry, '--version'], { encoding: 'utf8' });
+  assert.equal(execFileSync(process.execPath, [entry, '-v'], { encoding: 'utf8' }), version);
+  assert.equal(execFileSync(process.execPath, [entry, '-V'], { encoding: 'utf8' }), version);
+});

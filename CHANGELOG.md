@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.1
+
+- Match the web picker: one compatible format per resolution, one audio source,
+  and an MP3 action, with exact/estimated source sizes and no codec duplicates.
+- Add animated terminal activity, elapsed time, preparation progress and separate
+  file-saving bytes/speed/ETA. Piped logs remain plain and concise.
+- Accept `save -v` as well as `save -V` and `save --version`.
+- Poll job updates every 500 ms instead of 1 second.
+
 ## 2.0.0
 
 ### Breaking changes

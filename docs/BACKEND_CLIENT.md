@@ -5,6 +5,14 @@ or Python. The backend owns inspection, exact-format selection validation,
 downloading, merging/conversion, verification and completion tracking. The client
 only displays formats/progress and streams the ready file to disk.
 
+The interactive picker and `--list-formats` collapse raw duplicates using the
+same compatibility ranking as the web: one actual ID per resolution, H.264/MP4
+preferred, then one audio source. `--format` still accepts any advertised real ID.
+The picker offers original audio and an MP3 action for that same source. Size
+estimates are source sizes, not promises about merged or converted output size.
+TTY progress distinguishes indeterminate inspection/startup, backend preparation
+percentages and the separate file-transfer phase. Non-TTY logs have no ANSI codes.
+
 ## Configure and use
 
 ```sh

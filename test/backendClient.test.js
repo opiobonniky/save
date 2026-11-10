@@ -46,7 +46,7 @@ test('complete backend workflow retains session/CSRF and streams Unicode attachm
     }
     if (req.url === '/api/v1/downloads/job') return json(res, { id: 'job', status: 'READY', progress: 100 });
     if (req.url === '/api/v1/downloads/job/artifact') {
-      res.writeHead(200, { 'Content-Disposition': "attachment; filename*=UTF-8''Caf%C3%A9.mkv" });
+      res.writeHead(200, { 'Content-Disposition': "attachment; filename*=UTF-8''Caf%C3%A9.mkv", 'Content-Length': String(Buffer.byteLength('verified media bytes')) });
       return res.end('verified media bytes');
     }
     res.writeHead(404); res.end();
@@ -58,7 +58,10 @@ test('complete backend workflow retains session/CSRF and streams Unicode attachm
   assert.equal(selection.formatId, '137');
   assert.match(selection.requestKey, /^[0-9a-f-]{36}$/);
   const dir = await output(t);
-  const file = await client.saveArtifact(job, dir);
+  const progress = [];
+  const file = await client.saveArtifact(job, dir, { onProgress: value => progress.push(value) });
+  assert.equal(progress.at(-1).received, Buffer.byteLength('verified media bytes'));
+  assert.equal(progress.at(-1).total, Buffer.byteLength('verified media bytes'));
   assert.equal(path.basename(file), 'Café.mkv');
   assert.equal(await readFile(file, 'utf8'), 'verified media bytes');
   assert.deepEqual(await readdir(dir), ['Café.mkv']);

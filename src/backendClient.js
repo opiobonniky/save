@@ -7,6 +7,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { VERSION } from './version.js';
+import { transferMeter } from './terminalProgress.js';
 
 export function backendUrl(value) {
   const url = new URL(value);
@@ -33,7 +34,7 @@ export function artifactFilename(disposition) {
 }
 
 export class BackendClient {
-  constructor(baseUrl, { pollMs = 1000, timeoutMs = 15 * 60_000 } = {}) {
+  constructor(baseUrl, { pollMs = 500, timeoutMs = 15 * 60_000 } = {}) {
     this.base = backendUrl(baseUrl);
     this.pollMs = pollMs;
     this.timeoutMs = timeoutMs;
@@ -130,7 +131,7 @@ export class BackendClient {
     return this.json(`/downloads/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {}, signal: AbortSignal.timeout(5000) });
   }
 
-  async saveArtifact(job, directory, { overwrite = false, signal } = {}) {
+  async saveArtifact(job, directory, { overwrite = false, signal, onProgress = () => {} } = {}) {
     const response = await this.response(`/downloads/${encodeURIComponent(job.id)}/artifact`, { signal });
     if (response.statusCode !== 200) { response.resume(); throw new Error(`Could not retrieve backend file (HTTP ${response.statusCode}).`); }
     const filename = artifactFilename(response.headers['content-disposition']);
@@ -138,7 +139,8 @@ export class BackendClient {
     const temporary = path.join(directory, `.save-${randomUUID()}.part`);
     try {
       await mkdir(directory, { recursive: true });
-      await pipeline(response, createWriteStream(temporary, { flags: 'wx', mode: 0o600 }), { signal });
+      const total = Number(response.headers['content-length']) || null;
+      await pipeline(response, transferMeter(total, onProgress), createWriteStream(temporary, { flags: 'wx', mode: 0o600 }), { signal });
       if (overwrite) await rename(temporary, destination);
       else await link(temporary, destination); // Atomic no-clobber; never replace existing user files.
       return destination;
